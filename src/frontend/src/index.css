@@ -1,0 +1,347 @@
+@font-face {
+  font-family: "Fraunces";
+  src: url("/assets/fonts/Fraunces.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Figtree";
+  src: url("/assets/fonts/Figtree.woff2") format("woff2");
+  font-weight: 300 900;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 10 0.02 30;
+    --foreground: 90 0.01 90;
+    --card: 12 0.02 30;
+    --card-foreground: 90 0.01 90;
+    --popover: 12 0.02 30;
+    --popover-foreground: 90 0.01 90;
+    --primary: 55 0.18 30;
+    --primary-foreground: 98 0.01 90;
+    --secondary: 20 0.02 30;
+    --secondary-foreground: 90 0.01 90;
+    --muted: 15 0.02 30;
+    --muted-foreground: 60 0.05 30;
+    --accent: 35 0.25 22;
+    --accent-foreground: 98 0.01 90;
+    --destructive: 45 0.22 28;
+    --destructive-foreground: 98 0.01 90;
+    --border: 20 0.03 30;
+    --input: 20 0.03 30;
+    --ring: 55 0.18 30;
+    --radius: 0.25rem;
+    --chart-1: 55 0.18 30;
+    --chart-2: 35 0.25 22;
+    --chart-3: 65 0.12 200;
+    --chart-4: 45 0.22 28;
+    --chart-5: 70 0.15 120;
+    --sidebar: 10 0.02 30;
+    --sidebar-foreground: 90 0.01 90;
+    --sidebar-primary: 55 0.18 30;
+    --sidebar-primary-foreground: 98 0.01 90;
+    --sidebar-accent: 20 0.02 30;
+    --sidebar-accent-foreground: 90 0.01 90;
+    --sidebar-border: 20 0.03 30;
+    --sidebar-ring: 55 0.18 30;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Figtree", sans-serif;
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+.game-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.hud-days {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  color: #e8c4a0;
+  font-family: "Fraunces", serif;
+  font-size: 1.1rem;
+  text-shadow: 0 0 10px rgba(200, 80, 50, 0.8);
+  letter-spacing: 0.05em;
+}
+
+.hud-items {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: #c4e0ff;
+  font-family: "Fraunces", serif;
+  font-size: 1.1rem;
+  text-shadow: 0 0 10px rgba(100, 150, 255, 0.8);
+  letter-spacing: 0.05em;
+  text-align: right;
+}
+
+.hud-crosshair {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.5);
+}
+
+.hud-hint {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 220, 180, 0.7);
+  font-family: "Figtree", sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 0 8px rgba(255, 100, 50, 0.5);
+}
+
+.overlay-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  pointer-events: all;
+}
+
+.start-overlay {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(20, 5, 5, 0.97) 0%,
+    rgba(5, 0, 5, 0.99) 100%
+  );
+}
+
+.death-overlay {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(60, 5, 5, 0.93) 0%,
+    rgba(10, 0, 5, 0.97) 100%
+  );
+}
+
+.gameover-overlay {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(30, 0, 0, 0.98) 0%,
+    rgba(5, 0, 5, 0.99) 100%
+  );
+}
+
+.victory-overlay {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(5, 20, 10, 0.97) 0%,
+    rgba(0, 5, 10, 0.99) 100%
+  );
+}
+
+.overlay-title {
+  font-family: "Fraunces", serif;
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-weight: 700;
+  color: #f5e8d0;
+  text-shadow: 0 0 40px rgba(200, 100, 50, 0.8), 0 0 80px rgba(200, 50, 50, 0.4);
+  text-align: center;
+  line-height: 1.1;
+  margin-bottom: 0.5rem;
+}
+
+.overlay-subtitle {
+  font-family: "Figtree", sans-serif;
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
+  color: rgba(220, 180, 160, 0.7);
+  text-align: center;
+  margin-bottom: 2.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  max-width: 500px;
+  line-height: 1.6;
+}
+
+.overlay-status {
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  color: #ff6b6b;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 0 20px rgba(255, 50, 50, 0.6);
+}
+
+.overlay-victory-status {
+  font-family: "Fraunces", serif;
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  color: #6bffb8;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 0 20px rgba(50, 255, 150, 0.6);
+}
+
+.horror-btn {
+  font-family: "Fraunces", serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 0.85rem 2.5rem;
+  border: 1px solid rgba(200, 100, 50, 0.4);
+  background: rgba(30, 5, 5, 0.8);
+  color: #e8c4a0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.horror-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(200, 80, 30, 0);
+  transition: background 0.3s ease;
+}
+
+.horror-btn:hover {
+  border-color: rgba(220, 100, 50, 0.8);
+  color: #fff;
+  text-shadow: 0 0 15px rgba(255, 150, 80, 0.9);
+  box-shadow: 0 0 30px rgba(200, 80, 30, 0.3), inset 0 0 30px
+    rgba(200, 80, 30, 0.1);
+}
+
+.horror-btn:hover::before {
+  background: rgba(200, 80, 30, 0.08);
+}
+
+.horror-btn-success {
+  border-color: rgba(50, 200, 100, 0.4);
+  background: rgba(5, 20, 10, 0.8);
+  color: #a0e8c4;
+}
+
+.horror-btn-success:hover {
+  border-color: rgba(80, 220, 130, 0.8);
+  color: #fff;
+  text-shadow: 0 0 15px rgba(80, 255, 150, 0.9);
+  box-shadow: 0 0 30px rgba(50, 200, 100, 0.3), inset 0 0 30px
+    rgba(50, 200, 100, 0.1);
+}
+
+.skull-icon {
+  display: inline-block;
+  font-size: 1.4rem;
+  margin: 0 3px;
+  filter: drop-shadow(0 0 6px rgba(200, 80, 50, 0.8));
+}
+
+.skull-icon.dead {
+  opacity: 0.2;
+  filter: none;
+}
+
+.candle-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.nitya-name {
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  color: #c8a8ff;
+  text-shadow: 0 0 20px rgba(180, 100, 255, 0.9);
+}
+
+.flicker-text {
+  animation: flicker 3s ease-in-out infinite;
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  48% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  52% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 0.85;
+  }
+  76% {
+    opacity: 1;
+  }
+}
+
+.horror-divider {
+  width: 200px;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(200, 80, 50, 0.5),
+    transparent
+  );
+  margin: 1.5rem auto;
+}
