@@ -345,3 +345,24 @@ body,
   );
   margin: 1.5rem auto;
 }
+
+.characters-overlay {
+  background: radial-gradient(
+    ellipse at 30% 20%,
+    rgba(25, 5, 35, 0.98) 0%,
+    rgba(5, 2, 8, 0.99) 100%
+  );
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+@keyframes fadeInCard {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
