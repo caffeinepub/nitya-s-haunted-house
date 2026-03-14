@@ -139,8 +139,29 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
   const gateColor = gateUnlocked ? "#00ff88" : "#cc2200";
   const gateEmissive = gateUnlocked ? "#00aa44" : "#880000";
 
+  const windowPositions: Array<[number, number, number, string]> = [
+    [-12, 2.2, -10, "x"],
+    [-12, 2.2, 5, "x"],
+    [12, 2.2, -10, "x"],
+    [12, 2.2, 5, "x"],
+    [-6, 2.2, -20, "z"],
+    [6, 2.2, -20, "z"],
+    [-6, 2.2, 15, "z"],
+    [6, 2.2, 15, "z"],
+  ];
+
+  const gravestonePositions: Array<[number, number, number, number]> = [
+    [-9, 0, -14, 0.3],
+    [9, 0, -14, -0.5],
+    [-9, 0, 10, 0.8],
+    [9, 0, 10, -0.2],
+    [-7, 0, -17, 0.1],
+    [7, 0, -17, -0.6],
+  ];
+
   return (
     <group>
+      {/* Floor */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0, -2.5]}
@@ -149,16 +170,125 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
         <planeGeometry args={[24, 35]} />
         <meshStandardMaterial color="#1a1008" roughness={1} />
       </mesh>
+      {/* Ceiling */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, ROOM_HEIGHT, -2.5]}>
         <planeGeometry args={[24, 35]} />
-        <meshStandardMaterial color="#0d0a08" roughness={1} />
+        <meshStandardMaterial color="#0a0806" roughness={1} />
       </mesh>
+      {/* Walls - darker stone */}
       {WALLS.map((w) => (
         <mesh key={w.id} position={w.pos} castShadow receiveShadow>
           <boxGeometry args={w.size} />
-          <meshStandardMaterial color="#1c1410" roughness={0.9} />
+          <meshStandardMaterial color="#16100c" roughness={0.95} />
         </mesh>
       ))}
+      {/* Roof ridge beam */}
+      <mesh position={[0, ROOM_HEIGHT + 2.5, -2.5]} castShadow>
+        <boxGeometry args={[0.4, 0.4, 35.5]} />
+        <meshStandardMaterial color="#0e0c10" roughness={0.95} />
+      </mesh>
+      {/* Left roof slope */}
+      <mesh
+        position={[-6, ROOM_HEIGHT + 1.2, -2.5]}
+        rotation={[0, 0, 0.45]}
+        castShadow
+      >
+        <boxGeometry args={[13.5, 0.35, 35.5]} />
+        <meshStandardMaterial
+          color="#12101a"
+          roughness={0.95}
+          metalness={0.1}
+        />
+      </mesh>
+      {/* Right roof slope */}
+      <mesh
+        position={[6, ROOM_HEIGHT + 1.2, -2.5]}
+        rotation={[0, 0, -0.45]}
+        castShadow
+      >
+        <boxGeometry args={[13.5, 0.35, 35.5]} />
+        <meshStandardMaterial
+          color="#12101a"
+          roughness={0.95}
+          metalness={0.1}
+        />
+      </mesh>
+      {/* Gable north */}
+      <mesh position={[0, ROOM_HEIGHT + 1.25, -20.25]} castShadow>
+        <coneGeometry args={[13.5, 2.5, 3]} />
+        <meshStandardMaterial color="#16100c" roughness={0.95} />
+      </mesh>
+      {/* Gable south */}
+      <mesh position={[0, ROOM_HEIGHT + 1.25, 15.25]} castShadow>
+        <coneGeometry args={[13.5, 2.5, 3]} />
+        <meshStandardMaterial color="#16100c" roughness={0.95} />
+      </mesh>
+      {/* Glowing window frames */}
+      {windowPositions.map(([x, y, z, axis]) => {
+        const rotY = axis === "x" ? 0 : Math.PI / 2;
+        return (
+          <group key={`win-${x}-${z}`} position={[x, y, z]}>
+            <mesh rotation={[0, rotY, 0]}>
+              <boxGeometry args={[1.6, 1.4, 0.15]} />
+              <meshStandardMaterial color="#1a1208" roughness={0.8} />
+            </mesh>
+            <mesh rotation={[0, rotY, 0]}>
+              <planeGeometry args={[1.1, 0.95]} />
+              <meshStandardMaterial
+                color="#ff9922"
+                emissive="#ff7700"
+                emissiveIntensity={1.8}
+                transparent
+                opacity={0.7}
+              />
+            </mesh>
+            <pointLight color="#ff8800" intensity={0.8} distance={6} />
+          </group>
+        );
+      })}
+      {/* Door frame at corridor entrance */}
+      <group position={[0, ROOM_HEIGHT / 2, 5]}>
+        <mesh position={[-2.2, 0, 0]}>
+          <boxGeometry args={[0.3, ROOM_HEIGHT, 0.35]} />
+          <meshStandardMaterial color="#251a0e" roughness={0.9} />
+        </mesh>
+        <mesh position={[2.2, 0, 0]}>
+          <boxGeometry args={[0.3, ROOM_HEIGHT, 0.35]} />
+          <meshStandardMaterial color="#251a0e" roughness={0.9} />
+        </mesh>
+        <mesh position={[0, ROOM_HEIGHT / 2 - 0.15, 0]}>
+          <boxGeometry args={[4.7, 0.35, 0.35]} />
+          <meshStandardMaterial color="#251a0e" roughness={0.9} />
+        </mesh>
+      </group>
+      {/* Gravestones */}
+      {gravestonePositions.map(([x, y, z, rot]) => (
+        <group
+          key={`grave-${x}-${z}`}
+          position={[x, y, z]}
+          rotation={[0, rot, 0]}
+        >
+          <mesh position={[0, 0.6, 0]} castShadow>
+            <boxGeometry args={[0.5, 1.2, 0.12]} />
+            <meshStandardMaterial color="#1a1820" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 0.9, 0]} castShadow>
+            <boxGeometry args={[0.7, 0.12, 0.14]} />
+            <meshStandardMaterial color="#1a1820" roughness={0.95} />
+          </mesh>
+          <mesh position={[0, 0.06, 0]}>
+            <boxGeometry args={[0.65, 0.12, 0.3]} />
+            <meshStandardMaterial color="#141218" roughness={1} />
+          </mesh>
+          <pointLight
+            color="#4422aa"
+            intensity={0.3}
+            distance={2.5}
+            position={[0, 0.5, 0]}
+          />
+        </group>
+      ))}
+      {/* Gate */}
       <group position={GATE_POS}>
         <mesh>
           <boxGeometry args={[3, 3.5, 0.2]} />
@@ -172,6 +302,7 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
         </mesh>
         <pointLight color={gateColor} intensity={3} distance={8} />
       </group>
+      {/* Furniture/debris */}
       <mesh position={[-9, 0.5, -10]} castShadow>
         <boxGeometry args={[1.5, 1, 1.5]} />
         <meshStandardMaterial color="#1a1008" roughness={1} />
@@ -187,7 +318,6 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
     </group>
   );
 }
-
 // =====================
 // Collectible Items
 // =====================
@@ -225,7 +355,7 @@ function CollectibleItem({
 }
 
 // =====================
-// Ghost (Nitya)
+// Ghost (Nitya) - Dark Warrior Queen
 // =====================
 function Ghost({
   playerPos,
@@ -241,7 +371,23 @@ function Ghost({
   const ghostRef = useRef<THREE.Group>(null);
   const ghostPos = useRef(new THREE.Vector3(-10, 0, -15));
   const catchCooldown = useRef(0);
-  const meshRef = useRef<THREE.Mesh>(null);
+  // Keep unused refs for compatibility
+  const bodyRef = useRef<THREE.Mesh>(null);
+  const _tailRef = useRef<THREE.Mesh>(null);
+  const _trailRef = useRef<THREE.Mesh>(null);
+  const _orbRefs = useRef<THREE.Mesh[]>([]);
+  const _orbAngles = useRef<number[]>([0, 0.8, 1.6, 2.4, 3.2, 4.0, 4.8, 5.6]);
+
+  // Queen-specific refs
+  const queenGroupRef = useRef<THREE.Group>(null);
+  const robeRef = useRef<THREE.Mesh>(null);
+  const leftFanRef = useRef<THREE.Group>(null);
+  const rightFanRef = useRef<THREE.Group>(null);
+  const trail1Ref = useRef<THREE.Mesh>(null);
+  const trail2Ref = useRef<THREE.Mesh>(null);
+  const trail3Ref = useRef<THREE.Mesh>(null);
+  const redLightRef = useRef<THREE.PointLight>(null);
+  const crownMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
 
   useEffect(() => {
     ghostPosRef.current = ghostPos.current;
@@ -268,9 +414,53 @@ function Ghost({
     ghostRef.current.position.set(gp.x, PLAYER_HEIGHT / 2, gp.z);
     ghostRef.current.lookAt(target.x, PLAYER_HEIGHT / 2, target.z);
 
-    if (meshRef.current) {
-      const mat = meshRef.current.material as THREE.MeshStandardMaterial;
-      mat.emissiveIntensity = 0.8 + Math.sin(state.clock.elapsedTime * 5) * 0.3;
+    const t = state.clock.elapsedTime;
+    const emissive = 0.6 + Math.sin(t * 4) * 0.3;
+
+    // Float + sway whole queen group
+    if (queenGroupRef.current) {
+      queenGroupRef.current.position.y = Math.sin(t * 1.5) * 0.15;
+      queenGroupRef.current.rotation.z = Math.sin(t * 0.8) * 0.1;
+      // Lean forward when close and chasing
+      queenGroupRef.current.rotation.x = dist < 5 ? 0.15 : 0;
+    }
+
+    // Robe billowing
+    if (robeRef.current) {
+      robeRef.current.scale.x = 1 + Math.sin(t * 3) * 0.15;
+      const mat = robeRef.current.material as THREE.MeshStandardMaterial;
+      mat.emissiveIntensity = emissive * 0.4;
+    }
+
+    // Left fan spread/close (opens dramatically)
+    if (leftFanRef.current) {
+      leftFanRef.current.rotation.z = 0.4 + Math.sin(t * 2) * 0.6;
+    }
+    // Right fan opposite phase
+    if (rightFanRef.current) {
+      rightFanRef.current.rotation.z = -(0.4 + Math.sin(t * 2 + Math.PI) * 0.6);
+    }
+
+    // Trailing fabric flutter
+    const trailMeshes = [trail1Ref, trail2Ref, trail3Ref];
+    trailMeshes.forEach((ref, i) => {
+      if (ref.current) {
+        ref.current.rotation.x = Math.sin(t * 2.5 + i * 0.9) * 0.25;
+        ref.current.rotation.z = Math.sin(t * 1.8 + i * 1.2) * 0.12;
+        const mat = ref.current.material as THREE.MeshStandardMaterial;
+        mat.opacity = 0.35 + Math.sin(t * 2 + i) * 0.1;
+      }
+    });
+
+    // Crown spike emissive pulse when close
+    for (const mat of crownMatsRef.current) {
+      if (mat)
+        mat.emissiveIntensity = dist < 6 ? 0.5 + Math.sin(t * 6) * 0.4 : 0.1;
+    }
+
+    // Pulsing red light
+    if (redLightRef.current) {
+      redLightRef.current.intensity = 2.5 + Math.sin(t * 4) * 1.0;
     }
 
     if (dist < GHOST_DEATH_RADIUS && catchCooldown.current <= 0) {
@@ -280,48 +470,268 @@ function Ghost({
     }
   });
 
+  // Fan blade geometry helper (7 blades fanned in an arc)
+  const fanBlades = Array.from({ length: 7 }, (_, i) => i);
+
   return (
     <group ref={ghostRef} position={[-10, PLAYER_HEIGHT / 2, -15]}>
-      <mesh ref={meshRef}>
-        <capsuleGeometry args={[0.4, 1.2, 8, 16]} />
+      <group ref={queenGroupRef}>
+        {/* === BODY / TORSO === */}
+        <mesh ref={bodyRef} position={[0, 0.3, 0]}>
+          <boxGeometry args={[0.28, 0.7, 0.18]} />
+          <meshStandardMaterial
+            color="#1a0008"
+            emissive="#cc1122"
+            emissiveIntensity={0.5}
+            roughness={0.6}
+            transparent
+            opacity={0.92}
+          />
+        </mesh>
+
+        {/* === ROBE / SKIRT (flaring cone) === */}
+        <mesh ref={robeRef} position={[0, -0.3, 0]} rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.65, 1.1, 12, 1, true]} />
+          <meshStandardMaterial
+            color="#330008"
+            emissive="#cc1122"
+            emissiveIntensity={0.2}
+            transparent
+            opacity={0.78}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+            roughness={0.8}
+          />
+        </mesh>
+
+        {/* === HEAD === */}
+        <mesh position={[0, 0.82, 0]}>
+          <sphereGeometry args={[0.18, 12, 12]} />
+          <meshStandardMaterial
+            color="#2a0010"
+            emissive="#cc1122"
+            emissiveIntensity={0.4}
+            roughness={0.5}
+          />
+        </mesh>
+
+        {/* === GLOWING RED EYES === */}
+        <mesh position={[-0.07, 0.86, 0.16]}>
+          <sphereGeometry args={[0.035, 8, 8]} />
+          <meshStandardMaterial
+            emissive="#ff2200"
+            emissiveIntensity={4}
+            color="#ff0000"
+          />
+        </mesh>
+        <mesh position={[0.07, 0.86, 0.16]}>
+          <sphereGeometry args={[0.035, 8, 8]} />
+          <meshStandardMaterial
+            emissive="#ff2200"
+            emissiveIntensity={4}
+            color="#ff0000"
+          />
+        </mesh>
+
+        {/* === SPIKE CROWN (5 spikes in semicircle) === */}
+        {[0, 1, 2, 3, 4].map((i) => {
+          const angle = (i / 4) * Math.PI - Math.PI / 2;
+          const r = 0.14;
+          return (
+            <mesh
+              key={`crown-${i}`}
+              position={[
+                Math.cos(angle) * r,
+                1.04 + (i === 2 ? 0.08 : 0),
+                Math.sin(angle) * r * 0.4,
+              ]}
+              rotation={[
+                i === 2 ? -0.1 : i < 2 ? -0.15 : 0.15,
+                0,
+                (i - 2) * 0.18,
+              ]}
+              ref={(el) => {
+                if (el) {
+                  const mat = el.material as THREE.MeshStandardMaterial;
+                  if (!crownMatsRef.current.includes(mat))
+                    crownMatsRef.current.push(mat);
+                }
+              }}
+            >
+              <coneGeometry args={[0.025, 0.2 + (i === 2 ? 0.07 : 0), 6]} />
+              <meshStandardMaterial
+                color="#666666"
+                emissive="#cc1122"
+                emissiveIntensity={0.1}
+                metalness={0.8}
+                roughness={0.2}
+              />
+            </mesh>
+          );
+        })}
+
+        {/* === LEFT FAN ARM === */}
+        <group
+          ref={leftFanRef}
+          position={[-0.28, 0.35, 0]}
+          rotation={[0, 0, 0.4]}
+        >
+          {fanBlades.map((i) => (
+            <mesh
+              key={`lfan-${i}`}
+              position={[
+                Math.cos((i - 3) * (Math.PI / 8)) * 0.22,
+                Math.sin((i - 3) * (Math.PI / 8)) * 0.22,
+                0,
+              ]}
+              rotation={[0, 0, (i - 3) * (Math.PI / 8)]}
+            >
+              <boxGeometry args={[0.04, 0.44, 0.008]} />
+              <meshStandardMaterial
+                color="#660010"
+                emissive="#cc1122"
+                emissiveIntensity={0.5}
+                transparent
+                opacity={0.85}
+                side={THREE.DoubleSide}
+                depthWrite={false}
+              />
+            </mesh>
+          ))}
+        </group>
+
+        {/* === RIGHT FAN ARM === */}
+        <group
+          ref={rightFanRef}
+          position={[0.28, 0.35, 0]}
+          rotation={[0, 0, -0.4]}
+        >
+          {fanBlades.map((i) => (
+            <mesh
+              key={`rfan-${i}`}
+              position={[
+                Math.cos((i - 3) * (Math.PI / 8)) * 0.22,
+                Math.sin((i - 3) * (Math.PI / 8)) * 0.22,
+                0,
+              ]}
+              rotation={[0, 0, (i - 3) * (Math.PI / 8)]}
+            >
+              <boxGeometry args={[0.04, 0.44, 0.008]} />
+              <meshStandardMaterial
+                color="#660010"
+                emissive="#cc1122"
+                emissiveIntensity={0.5}
+                transparent
+                opacity={0.85}
+                side={THREE.DoubleSide}
+                depthWrite={false}
+              />
+            </mesh>
+          ))}
+        </group>
+
+        {/* === TRAILING ROBE FABRIC === */}
+        <mesh ref={trail1Ref} position={[0, -0.6, 0.15]}>
+          <boxGeometry args={[0.5, 0.8, 0.01]} />
+          <meshStandardMaterial
+            color="#440010"
+            emissive="#cc1122"
+            emissiveIntensity={0.3}
+            transparent
+            opacity={0.4}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+        <mesh ref={trail2Ref} position={[0.18, -0.55, 0.2]}>
+          <boxGeometry args={[0.25, 0.7, 0.01]} />
+          <meshStandardMaterial
+            color="#330008"
+            emissive="#cc1122"
+            emissiveIntensity={0.25}
+            transparent
+            opacity={0.35}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+        <mesh ref={trail3Ref} position={[-0.18, -0.5, 0.22]}>
+          <boxGeometry args={[0.25, 0.65, 0.01]} />
+          <meshStandardMaterial
+            color="#330008"
+            emissive="#cc1122"
+            emissiveIntensity={0.25}
+            transparent
+            opacity={0.3}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+          />
+        </mesh>
+
+        {/* === RED AURA GLOW === */}
+        <pointLight
+          ref={redLightRef}
+          color="#cc1122"
+          intensity={2.5}
+          distance={7}
+          position={[0, 0.3, 0]}
+        />
+        <pointLight
+          color="#ff4400"
+          intensity={1.0}
+          distance={3}
+          position={[0, 0.9, 0.3]}
+        />
+      </group>
+    </group>
+  );
+}
+// =====================
+// Lighting
+// =====================
+function WallTorch({ position }: { position: [number, number, number] }) {
+  const lightRef = useRef<THREE.PointLight>(null);
+  const offset = useRef(Math.random() * Math.PI * 2);
+
+  useFrame((state) => {
+    if (lightRef.current) {
+      const t = state.clock.elapsedTime;
+      lightRef.current.intensity =
+        1.4 +
+        Math.sin(t * 7.3 + offset.current) * 0.4 +
+        Math.sin(t * 11 + offset.current) * 0.15;
+    }
+  });
+
+  return (
+    <group position={position}>
+      {/* Torch holder - small cylinder */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.04, 0.06, 0.3, 6]} />
+        <meshStandardMaterial color="#3a2208" roughness={0.8} metalness={0.3} />
+      </mesh>
+      {/* Flame glow sphere */}
+      <mesh position={[0, 0.2, 0]}>
+        <sphereGeometry args={[0.08, 6, 6]} />
         <meshStandardMaterial
-          color="#dde8ff"
-          emissive="#aabbff"
-          emissiveIntensity={0.8}
+          color="#ff9922"
+          emissive="#ff6600"
+          emissiveIntensity={3}
           transparent
-          opacity={0.75}
-          roughness={0}
+          opacity={0.85}
         />
       </mesh>
       <pointLight
-        color="#8899ff"
-        intensity={2}
-        distance={5}
-        position={[0, 0.6, 0.3]}
+        ref={lightRef}
+        color="#ff6822"
+        intensity={1.4}
+        distance={8}
+        castShadow
       />
-      <mesh position={[-0.15, 0.55, 0.35]}>
-        <sphereGeometry args={[0.06, 8, 8]} />
-        <meshStandardMaterial
-          emissive="#ff2244"
-          emissiveIntensity={3}
-          color="#ff0000"
-        />
-      </mesh>
-      <mesh position={[0.15, 0.55, 0.35]}>
-        <sphereGeometry args={[0.06, 8, 8]} />
-        <meshStandardMaterial
-          emissive="#ff2244"
-          emissiveIntensity={3}
-          color="#ff0000"
-        />
-      </mesh>
     </group>
   );
 }
 
-// =====================
-// Lighting
-// =====================
 function HouseLighting() {
   const light1 = useRef<THREE.PointLight>(null);
   const light2 = useRef<THREE.PointLight>(null);
@@ -329,53 +739,62 @@ function HouseLighting() {
   useFrame((state) => {
     if (light1.current) {
       light1.current.intensity =
-        1.2 + Math.sin(state.clock.elapsedTime * 7.3) * 0.15;
+        1.0 + Math.sin(state.clock.elapsedTime * 7.3) * 0.12;
     }
     if (light2.current) {
       light2.current.intensity =
-        0.9 + Math.sin(state.clock.elapsedTime * 5.1 + 1) * 0.12;
+        0.7 + Math.sin(state.clock.elapsedTime * 5.1 + 1) * 0.1;
     }
   });
 
   return (
     <>
-      <ambientLight intensity={0.08} color="#200818" />
+      {/* Low ambient with blue tint */}
+      <ambientLight intensity={0.15} color="#4466aa" />
+      {/* Dim blue fill from above */}
+      <directionalLight color="#223366" intensity={0.2} position={[0, 10, 0]} />
       <pointLight
         ref={light1}
         color="#ff6020"
-        intensity={1.2}
+        intensity={1.0}
         distance={12}
         position={[0, 3, 0]}
       />
       <pointLight
         ref={light2}
         color="#6020a0"
-        intensity={0.9}
+        intensity={0.7}
         distance={15}
         position={[-8, 3, -8]}
       />
       <pointLight
         color="#401808"
-        intensity={0.6}
+        intensity={0.5}
         distance={10}
         position={[8, 3, 8]}
       />
       <pointLight
         color="#301040"
-        intensity={0.8}
+        intensity={0.6}
         distance={12}
         position={[8, 3, -12]}
       />
       <pointLight
         color="#200808"
-        intensity={0.5}
+        intensity={0.4}
         distance={10}
         position={[-8, 3, 10]}
       />
+      {/* Wall torches */}
+      <WallTorch position={[-11.5, 2.5, -8]} />
+      <WallTorch position={[11.5, 2.5, -8]} />
+      <WallTorch position={[-11.5, 2.5, 6]} />
+      <WallTorch position={[11.5, 2.5, 6]} />
+      <WallTorch position={[0, 2.5, -19.5]} />
+      <WallTorch position={[0, 2.5, 14.5]} />
     </>
   );
 }
-
 // =====================
 // Mobile Camera Controller (inside Canvas)
 // =====================
@@ -558,7 +977,7 @@ function Scene({
 }) {
   return (
     <>
-      <fog attach="fog" args={["#050208", 5, 28]} />
+      <fogExp2 attach="fog" args={["#050810", 0.035]} />
       <HouseLighting />
       <HouseGeometry gateUnlocked={gameState.gateUnlocked} />
       {ITEM_POSITIONS.map(({ id, pos }) => (
