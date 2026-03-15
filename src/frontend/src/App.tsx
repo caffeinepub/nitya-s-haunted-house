@@ -714,12 +714,12 @@ function Ghost({
         {/* Left arm group (pivot at shoulder) */}
         <group ref={leftArmRef} position={[-0.22, 0.48, 0]}>
           {/* Left upper arm */}
-          <mesh position={[0, -0.18, 0]} rotation={[0, 0, 0.3]}>
+          <mesh position={[0, -0.18, 0]} rotation={[0, 0, 0]}>
             <cylinderGeometry args={[0.04, 0.035, 0.32, 14]} />
             <meshStandardMaterial color="#e8b89a" roughness={0.7} />
           </mesh>
           {/* Left forearm */}
-          <mesh position={[-0.1, -0.36, 0]} rotation={[0, 0, 0.5]}>
+          <mesh position={[0, -0.4, 0]} rotation={[0, 0, 0]}>
             <cylinderGeometry args={[0.032, 0.028, 0.28, 14]} />
             <meshStandardMaterial color="#e8b89a" roughness={0.7} />
           </mesh>
@@ -727,12 +727,12 @@ function Ghost({
         {/* Right arm group (pivot at shoulder) */}
         <group ref={rightArmRef} position={[0.22, 0.48, 0]}>
           {/* Right upper arm */}
-          <mesh position={[0, -0.18, 0]} rotation={[0, 0, -0.3]}>
+          <mesh position={[0, -0.18, 0]} rotation={[0, 0, 0]}>
             <cylinderGeometry args={[0.04, 0.035, 0.32, 14]} />
             <meshStandardMaterial color="#e8b89a" roughness={0.7} />
           </mesh>
           {/* Right forearm */}
-          <mesh position={[0.1, -0.36, 0]} rotation={[0, 0, -0.5]}>
+          <mesh position={[0, -0.4, 0]} rotation={[0, 0, 0]}>
             <cylinderGeometry args={[0.032, 0.028, 0.28, 14]} />
             <meshStandardMaterial color="#e8b89a" roughness={0.7} />
           </mesh>
