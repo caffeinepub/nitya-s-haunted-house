@@ -199,7 +199,7 @@ function WallMaterial({ seed }: { seed: number }) {
     mat.needsUpdate = true;
   }, [seed]);
 
-  return <meshStandardMaterial ref={matRef} color="#1c1410" roughness={0.95} />;
+  return <meshStandardMaterial ref={matRef} color="#5a5e62" roughness={0.95} />;
 }
 
 // =====================
@@ -238,12 +238,12 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
         receiveShadow
       >
         <planeGeometry args={[24, 35]} />
-        <meshStandardMaterial color="#1a1008" roughness={1} />
+        <meshStandardMaterial color="#585c60" roughness={1} />
       </mesh>
       {/* Ceiling */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, ROOM_HEIGHT, -2.5]}>
         <planeGeometry args={[24, 35]} />
-        <meshStandardMaterial color="#0a0806" roughness={1} />
+        <meshStandardMaterial color="#4a4e52" roughness={1} />
       </mesh>
       {/* Walls - darker stone */}
       {WALLS.map((w, index) => (
@@ -255,7 +255,7 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
       {/* Roof ridge beam */}
       <mesh position={[0, ROOM_HEIGHT + 2.5, -2.5]} castShadow>
         <boxGeometry args={[0.4, 0.4, 35.5]} />
-        <meshStandardMaterial color="#0e0c10" roughness={0.95} />
+        <meshStandardMaterial color="#545659" roughness={0.95} />
       </mesh>
       {/* Left roof slope */}
       <mesh
@@ -286,12 +286,12 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
       {/* Gable north */}
       <mesh position={[0, ROOM_HEIGHT + 1.25, -20.25]} castShadow>
         <coneGeometry args={[13.5, 2.5, 3]} />
-        <meshStandardMaterial color="#16100c" roughness={0.95} />
+        <meshStandardMaterial color="#565a5d" roughness={0.95} />
       </mesh>
       {/* Gable south */}
       <mesh position={[0, ROOM_HEIGHT + 1.25, 15.25]} castShadow>
         <coneGeometry args={[13.5, 2.5, 3]} />
-        <meshStandardMaterial color="#16100c" roughness={0.95} />
+        <meshStandardMaterial color="#565a5d" roughness={0.95} />
       </mesh>
       {/* Glowing window frames */}
       {windowPositions.map(([x, y, z, axis]) => {
@@ -375,15 +375,15 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
       {/* Furniture/debris */}
       <mesh position={[-9, 0.5, -10]} castShadow>
         <boxGeometry args={[1.5, 1, 1.5]} />
-        <meshStandardMaterial color="#1a1008" roughness={1} />
+        <meshStandardMaterial color="#585c60" roughness={1} />
       </mesh>
       <mesh position={[9, 0.75, -12]} castShadow>
         <boxGeometry args={[1.2, 1.5, 0.8]} />
-        <meshStandardMaterial color="#100c08" roughness={1} />
+        <meshStandardMaterial color="#505457" roughness={1} />
       </mesh>
       <mesh position={[-9, 0.4, 10]} castShadow>
         <boxGeometry args={[2, 0.8, 1]} />
-        <meshStandardMaterial color="#120e08" roughness={1} />
+        <meshStandardMaterial color="#525659" roughness={1} />
       </mesh>
     </group>
   );
