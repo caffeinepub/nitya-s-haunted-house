@@ -2286,25 +2286,179 @@ function DeathScreen({
 }
 
 function GameOverScreen({ onRestart }: { onRestart: () => void }) {
+  const [phase, setPhase] = useState(0);
+
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setPhase(1), 1500),
+      setTimeout(() => setPhase(2), 3200),
+      setTimeout(() => setPhase(3), 5200),
+      setTimeout(() => setPhase(4), 7500),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
   return (
-    <div className="overlay-screen gameover-overlay">
-      <div className="overlay-title">You couldn't escape</div>
-      <div className="horror-divider" />
+    <div
+      className="overlay-screen gameover-overlay"
+      style={{ overflow: "hidden" }}
+    >
+      {/* Phase 0: Initial text */}
       <div
-        className="overlay-subtitle"
-        style={{ color: "rgba(255,100,100,0.8)", marginBottom: "1rem" }}
+        className="overlay-title"
+        style={{
+          transition: "opacity 1s",
+          opacity: phase >= 1 ? 0.3 : 1,
+          fontSize: "clamp(1.8rem, 4vw, 3.5rem)",
+        }}
       >
-        <span className="nitya-name">Nitya</span> claimed your soul.
+        You couldn't escape...
       </div>
-      <div style={{ fontSize: "3rem", marginBottom: "2rem" }}>💀</div>
-      <button
-        type="button"
-        className="horror-btn"
-        onClick={onRestart}
-        data-ocid="game.primary_button"
+
+      {/* Nitya descend + lie down + eat animation */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
       >
-        Try Again
-      </button>
+        {/* Nitya figure */}
+        {phase >= 1 && (
+          <div
+            className={
+              phase === 1
+                ? "nitya-descend"
+                : phase === 2
+                  ? "nitya-liedown"
+                  : "nitya-eating"
+            }
+            style={{
+              position: "absolute",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              fontSize: "6rem",
+              filter: "drop-shadow(0 0 20px rgba(200,0,0,0.9))",
+              zIndex: 5,
+            }}
+          >
+            <span
+              style={{
+                fontSize: phase >= 2 ? "8rem" : "6rem",
+                transition: "font-size 0.8s",
+              }}
+            >
+              {phase >= 3 ? "👹" : "👸"}
+            </span>
+            {phase >= 2 && (
+              <div
+                style={{
+                  fontSize: "2rem",
+                  color: "rgba(220,30,30,0.9)",
+                  fontFamily: "'Fraunces', serif",
+                  textAlign: "center",
+                  marginTop: "0.3rem",
+                  animation: "fadeInSad 0.6s ease-in",
+                }}
+              >
+                {phase >= 3 ? "...and feasts." : "Nitya lies upon you..."}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Player lying flat */}
+        {phase >= 2 && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "28%",
+              fontSize: "4rem",
+              animation: "playerFlat 0.5s ease-out forwards",
+              filter: "drop-shadow(0 0 8px rgba(150,0,0,0.7))",
+              zIndex: 4,
+            }}
+          >
+            🫥
+          </div>
+        )}
+
+        {/* Blood splatter */}
+        {phase >= 3 && (
+          <div
+            style={{
+              position: "absolute",
+              width: "100%",
+              height: "100%",
+              zIndex: 3,
+              pointerEvents: "none",
+            }}
+          >
+            {["10%", "30%", "55%", "75%", "90%", "20%", "65%"].map(
+              (left, i) => (
+                <div
+                  key={left}
+                  className="blood-drop"
+                  style={{
+                    left,
+                    animationDelay: `${i * 0.18}s`,
+                    fontSize: `${1.2 + (i % 3) * 0.4}rem`,
+                  }}
+                >
+                  🩸
+                </div>
+              ),
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Phase 4: Final sad message + restart */}
+      {phase >= 4 && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "12%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "1rem",
+            animation: "fadeInSad 1s ease-in",
+            zIndex: 10,
+          }}
+        >
+          <div className="horror-divider" style={{ width: "260px" }} />
+          <div
+            style={{
+              color: "rgba(200,80,80,0.85)",
+              fontFamily: "'Fraunces', serif",
+              fontSize: "1.1rem",
+              textAlign: "center",
+              lineHeight: 1.6,
+              maxWidth: "320px",
+            }}
+          >
+            There was no one left to remember you.
+            <br />
+            <span className="nitya-name">Nitya</span> was satisfied.
+          </div>
+          <button
+            type="button"
+            className="horror-btn"
+            onClick={onRestart}
+            data-ocid="game.primary_button"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
     </div>
   );
 }
