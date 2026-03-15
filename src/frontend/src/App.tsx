@@ -452,6 +452,7 @@ function Ghost({
   const ghostRef = useRef<THREE.Group>(null);
   const ghostPos = useRef(new THREE.Vector3(-10, 0, -15));
   const catchCooldown = useRef(0);
+  const ghostCurrentQuat = useRef(new THREE.Quaternion());
   // Keep unused refs for compatibility
   const bodyRef = useRef<THREE.Mesh>(null);
   const _tailRef = useRef<THREE.Mesh>(null);
@@ -469,6 +470,10 @@ function Ghost({
   const trail3Ref = useRef<THREE.Mesh>(null);
   const redLightRef = useRef<THREE.PointLight>(null);
   const crownMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const leftLegRef = useRef<THREE.Group>(null);
+  const rightLegRef = useRef<THREE.Group>(null);
+  const leftArmRef = useRef<THREE.Group>(null);
+  const rightArmRef = useRef<THREE.Group>(null);
 
   useEffect(() => {
     ghostPosRef.current = ghostPos.current;
@@ -483,7 +488,7 @@ function Ghost({
     const gp = ghostPos.current;
     const dist = gp.distanceTo(new THREE.Vector3(target.x, 0, target.z));
 
-    const speed = dist > 8 ? 0.7 : dist > 4 ? 1.2 : 1.5;
+    const speed = 0.7 + 0.8 * Math.max(0, 1 - dist / 8);
     const dir = new THREE.Vector3(
       target.x - gp.x,
       0,
@@ -492,18 +497,41 @@ function Ghost({
     gp.x += dir.x * speed * delta;
     gp.z += dir.z * speed * delta;
 
-    ghostRef.current.position.set(gp.x, PLAYER_HEIGHT / 2, gp.z);
-    ghostRef.current.lookAt(target.x, PLAYER_HEIGHT / 2, target.z);
+    const targetQuat = new THREE.Quaternion();
+    ghostRef.current.position.set(gp.x, 0, gp.z);
+    const lookTarget = new THREE.Object3D();
+    lookTarget.position.set(target.x, PLAYER_HEIGHT / 2, target.z);
+    ghostRef.current.updateWorldMatrix(false, false);
+    const tmpObj = new THREE.Object3D();
+    tmpObj.position.copy(ghostRef.current.position);
+    tmpObj.lookAt(target.x, PLAYER_HEIGHT / 2, target.z);
+    targetQuat.copy(tmpObj.quaternion);
+    ghostCurrentQuat.current.slerp(targetQuat, 0.12);
+    ghostRef.current.quaternion.copy(ghostCurrentQuat.current);
 
     const t = state.clock.elapsedTime;
     const emissive = 0.6 + Math.sin(t * 4) * 0.3;
 
-    // Float + sway whole queen group
+    // Keep queen group grounded
     if (queenGroupRef.current) {
-      queenGroupRef.current.position.y = Math.sin(t * 1.5) * 0.15;
-      queenGroupRef.current.rotation.z = Math.sin(t * 0.8) * 0.1;
-      // Lean forward when close and chasing
-      queenGroupRef.current.rotation.x = dist < 5 ? 0.15 : 0;
+      queenGroupRef.current.position.y = 1.0;
+      // Lean forward when running
+      queenGroupRef.current.rotation.x = dist < 10 ? -0.18 : -0.02;
+      queenGroupRef.current.rotation.z = 0;
+    }
+    // Running leg animation
+    if (leftLegRef.current && rightLegRef.current) {
+      const runFreq = 6;
+      const runAmp = dist < 10 ? 0.55 : 0.1;
+      leftLegRef.current.rotation.x = Math.sin(t * runFreq) * runAmp;
+      rightLegRef.current.rotation.x = Math.sin(t * runFreq + Math.PI) * runAmp;
+    }
+    // Arm swing (opposite to legs)
+    if (leftArmRef.current && rightArmRef.current) {
+      const runFreq = 6;
+      const armAmp = dist < 10 ? 0.4 : 0.05;
+      leftArmRef.current.rotation.x = Math.sin(t * runFreq + Math.PI) * armAmp;
+      rightArmRef.current.rotation.x = Math.sin(t * runFreq) * armAmp;
     }
 
     // Robe billowing
@@ -553,59 +581,105 @@ function Ghost({
   const fanBlades = Array.from({ length: 9 }, (_, i) => i);
 
   return (
-    <group ref={ghostRef} position={[-10, PLAYER_HEIGHT / 2, -15]}>
-      <group ref={queenGroupRef}>
+    <group ref={ghostRef} position={[-10, 0, -15]}>
+      <group ref={queenGroupRef} position={[0, 1.0, 0]} scale={[1.1, 1.1, 1.1]}>
         {/* === LEGS === */}
-        {/* Left leg */}
-        <mesh position={[-0.09, -0.55, 0]}>
-          <cylinderGeometry args={[0.045, 0.04, 0.5, 8]} />
-          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
-        </mesh>
-        {/* Left boot */}
-        <mesh position={[-0.09, -0.82, 0]}>
-          <cylinderGeometry args={[0.05, 0.055, 0.18, 8]} />
-          <meshStandardMaterial
-            color="#1a0a0a"
-            roughness={0.6}
-            metalness={0.3}
-          />
-        </mesh>
-        {/* Right leg */}
-        <mesh position={[0.09, -0.55, 0]}>
-          <cylinderGeometry args={[0.045, 0.04, 0.5, 8]} />
-          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
-        </mesh>
-        {/* Right boot */}
-        <mesh position={[0.09, -0.82, 0]}>
-          <cylinderGeometry args={[0.05, 0.055, 0.18, 8]} />
-          <meshStandardMaterial
-            color="#1a0a0a"
-            roughness={0.6}
-            metalness={0.3}
-          />
-        </mesh>
+        {/* Left leg group (pivot at hip) */}
+        <group ref={leftLegRef} position={[-0.09, -0.3, 0]}>
+          {/* Left leg */}
+          <mesh position={[0, -0.25, 0]}>
+            <cylinderGeometry args={[0.045, 0.04, 0.5, 14]} />
+            <meshStandardMaterial color="#e8b89a" roughness={0.7} />
+          </mesh>
+          {/* Left boot */}
+          <mesh position={[0, -0.52, 0]}>
+            <cylinderGeometry args={[0.05, 0.055, 0.18, 8]} />
+            <meshStandardMaterial
+              color="#1a0a0a"
+              roughness={0.6}
+              metalness={0.3}
+            />
+          </mesh>
+        </group>
+        {/* Right leg group (pivot at hip) */}
+        <group ref={rightLegRef} position={[0.09, -0.3, 0]}>
+          {/* Right leg */}
+          <mesh position={[0, -0.25, 0]}>
+            <cylinderGeometry args={[0.045, 0.04, 0.5, 14]} />
+            <meshStandardMaterial color="#e8b89a" roughness={0.7} />
+          </mesh>
+          {/* Right boot */}
+          <mesh position={[0, -0.52, 0]}>
+            <cylinderGeometry args={[0.05, 0.055, 0.18, 8]} />
+            <meshStandardMaterial
+              color="#1a0a0a"
+              roughness={0.6}
+              metalness={0.3}
+            />
+          </mesh>
+        </group>
 
-        {/* === ROBE / SKIRT (solid deep red) === */}
-        <mesh ref={robeRef} position={[0, -0.28, 0]} rotation={[Math.PI, 0, 0]}>
-          <coneGeometry args={[0.68, 1.0, 14, 1, false]} />
+        {/* === LAYERED FABRIC SKIRT (panels, no cone) === */}
+        {/* Front panel */}
+        <mesh ref={robeRef} position={[0, -0.35, 0.18]}>
+          <cylinderGeometry args={[0.35, 0.55, 0.85, 20, 1, true, -0.6, 1.2]} />
           <meshStandardMaterial
-            color="#8b0000"
+            color="#6b0000"
             emissive="#cc2200"
-            emissiveIntensity={0.15}
-            roughness={0.7}
+            emissiveIntensity={0.12}
+            roughness={0.75}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+        {/* Back panel */}
+        <mesh position={[0, -0.35, -0.18]}>
+          <cylinderGeometry
+            args={[0.35, 0.55, 0.85, 20, 1, true, Math.PI - 0.6, 1.2]}
+          />
+          <meshStandardMaterial
+            color="#5a0000"
+            emissive="#cc2200"
+            emissiveIntensity={0.1}
+            roughness={0.8}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+        {/* Left panel */}
+        <mesh position={[-0.18, -0.35, 0]}>
+          <cylinderGeometry
+            args={[0.35, 0.55, 0.85, 20, 1, true, -Math.PI / 2 - 0.6, 1.2]}
+          />
+          <meshStandardMaterial
+            color="#630000"
+            emissive="#cc2200"
+            emissiveIntensity={0.11}
+            roughness={0.78}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+        {/* Right panel */}
+        <mesh position={[0.18, -0.35, 0]}>
+          <cylinderGeometry
+            args={[0.35, 0.55, 0.85, 20, 1, true, Math.PI / 2 - 0.6, 1.2]}
+          />
+          <meshStandardMaterial
+            color="#630000"
+            emissive="#cc2200"
+            emissiveIntensity={0.11}
+            roughness={0.78}
             side={THREE.DoubleSide}
           />
         </mesh>
 
         {/* === TORSO / CORSET === */}
         <mesh ref={bodyRef} position={[0, 0.28, 0]}>
-          <boxGeometry args={[0.3, 0.55, 0.18]} />
+          <cylinderGeometry args={[0.14, 0.17, 0.55, 16]} />
           <meshStandardMaterial
             color="#8b0000"
             emissive="#cc2200"
             emissiveIntensity={0.1}
-            roughness={0.5}
-            metalness={0.2}
+            roughness={0.45}
+            metalness={0.35}
           />
         </mesh>
         {/* Corset belt detail */}
@@ -620,7 +694,7 @@ function Ghost({
 
         {/* === SHOULDERS === */}
         <mesh position={[-0.2, 0.48, 0]}>
-          <sphereGeometry args={[0.075, 8, 8]} />
+          <sphereGeometry args={[0.085, 16, 16]} />
           <meshStandardMaterial
             color="#8b0000"
             roughness={0.5}
@@ -628,7 +702,7 @@ function Ghost({
           />
         </mesh>
         <mesh position={[0.2, 0.48, 0]}>
-          <sphereGeometry args={[0.075, 8, 8]} />
+          <sphereGeometry args={[0.085, 16, 16]} />
           <meshStandardMaterial
             color="#8b0000"
             roughness={0.5}
@@ -637,43 +711,49 @@ function Ghost({
         </mesh>
 
         {/* === ARMS === */}
-        {/* Left upper arm */}
-        <mesh position={[-0.22, 0.3, 0]} rotation={[0, 0, 0.3]}>
-          <cylinderGeometry args={[0.04, 0.035, 0.32, 8]} />
-          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
-        </mesh>
-        {/* Left forearm */}
-        <mesh position={[-0.32, 0.12, 0]} rotation={[0, 0, 0.5]}>
-          <cylinderGeometry args={[0.032, 0.028, 0.28, 8]} />
-          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
-        </mesh>
-        {/* Right upper arm */}
-        <mesh position={[0.22, 0.3, 0]} rotation={[0, 0, -0.3]}>
-          <cylinderGeometry args={[0.04, 0.035, 0.32, 8]} />
-          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
-        </mesh>
-        {/* Right forearm */}
-        <mesh position={[0.32, 0.12, 0]} rotation={[0, 0, -0.5]}>
-          <cylinderGeometry args={[0.032, 0.028, 0.28, 8]} />
-          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
-        </mesh>
+        {/* Left arm group (pivot at shoulder) */}
+        <group ref={leftArmRef} position={[-0.22, 0.48, 0]}>
+          {/* Left upper arm */}
+          <mesh position={[0, -0.18, 0]} rotation={[0, 0, 0.3]}>
+            <cylinderGeometry args={[0.04, 0.035, 0.32, 14]} />
+            <meshStandardMaterial color="#e8b89a" roughness={0.7} />
+          </mesh>
+          {/* Left forearm */}
+          <mesh position={[-0.1, -0.36, 0]} rotation={[0, 0, 0.5]}>
+            <cylinderGeometry args={[0.032, 0.028, 0.28, 14]} />
+            <meshStandardMaterial color="#e8b89a" roughness={0.7} />
+          </mesh>
+        </group>
+        {/* Right arm group (pivot at shoulder) */}
+        <group ref={rightArmRef} position={[0.22, 0.48, 0]}>
+          {/* Right upper arm */}
+          <mesh position={[0, -0.18, 0]} rotation={[0, 0, -0.3]}>
+            <cylinderGeometry args={[0.04, 0.035, 0.32, 14]} />
+            <meshStandardMaterial color="#e8b89a" roughness={0.7} />
+          </mesh>
+          {/* Right forearm */}
+          <mesh position={[0.1, -0.36, 0]} rotation={[0, 0, -0.5]}>
+            <cylinderGeometry args={[0.032, 0.028, 0.28, 14]} />
+            <meshStandardMaterial color="#e8b89a" roughness={0.7} />
+          </mesh>
+        </group>
 
         {/* === NECK === */}
         <mesh position={[0, 0.62, 0]}>
-          <cylinderGeometry args={[0.055, 0.065, 0.14, 8]} />
-          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
+          <cylinderGeometry args={[0.055, 0.065, 0.14, 14]} />
+          <meshStandardMaterial color="#e8b89a" roughness={0.7} />
         </mesh>
 
         {/* === HEAD (skin tone) === */}
         <mesh position={[0, 0.82, 0]}>
           <sphereGeometry args={[0.2, 14, 14]} />
-          <meshStandardMaterial color="#f2c9a0" roughness={0.6} />
+          <meshStandardMaterial color="#e8b89a" roughness={0.6} />
         </mesh>
 
         {/* === HAIR (long black, flowing back) === */}
         {/* Main hair mass on top/back */}
         <mesh position={[0, 0.88, -0.1]} rotation={[0.3, 0, 0]}>
-          <cylinderGeometry args={[0.19, 0.12, 0.4, 10]} />
+          <cylinderGeometry args={[0.19, 0.12, 0.4, 16]} />
           <meshStandardMaterial color="#0d0005" roughness={0.9} />
         </mesh>
         {/* Hair flowing down the back */}
@@ -1061,11 +1141,16 @@ function MobileCameraController({
   active: boolean;
 }) {
   const { camera } = useThree();
+  const smoothYaw = useRef(0);
+  const smoothPitch = useRef(0);
 
   useFrame(() => {
     if (!active) return;
     camera.rotation.order = "YXZ";
-    camera.rotation.set(pitchRef.current, yawRef.current, 0);
+    const lf = 0.3;
+    smoothYaw.current += (yawRef.current - smoothYaw.current) * lf;
+    smoothPitch.current += (pitchRef.current - smoothPitch.current) * lf;
+    camera.rotation.set(smoothPitch.current, smoothYaw.current, 0);
   });
 
   return null;
@@ -2285,164 +2370,1492 @@ function DeathScreen({
   );
 }
 
+// =====================
+// CSS Nitya Figure
+// =====================
+function NityaFigure({
+  pose,
+  style,
+  showJaw,
+}: {
+  pose: "standing" | "lying";
+  style?: React.CSSProperties;
+  showJaw?: boolean;
+}) {
+  const containerStyle: React.CSSProperties = {
+    position: "relative",
+    width: 90,
+    height: 200,
+    transform: pose === "lying" ? "rotate(90deg)" : "rotate(0deg)",
+    transformOrigin: "bottom center",
+    ...style,
+  };
+
+  return (
+    <div style={containerStyle}>
+      <style>{`
+        @keyframes leftLegRun {
+          0% { transform: rotate(-25deg); }
+          50% { transform: rotate(25deg); }
+          100% { transform: rotate(-25deg); }
+        }
+        @keyframes rightLegRun {
+          0% { transform: rotate(25deg); }
+          50% { transform: rotate(-25deg); }
+          100% { transform: rotate(25deg); }
+        }
+      `}</style>
+      {/* ── Long flowing hair behind head ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 28,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 76,
+          height: 130,
+          background:
+            "linear-gradient(to bottom, #0a0212 0%, #0d0318 50%, transparent 100%)",
+          borderRadius: "0 0 40px 40px",
+          zIndex: 0,
+          boxShadow: "inset 0 10px 20px rgba(80,0,160,0.15)",
+        }}
+      />
+      {/* Hair left strand */}
+      <div
+        style={{
+          position: "absolute",
+          top: 26,
+          left: 1,
+          width: 20,
+          height: 115,
+          background:
+            "linear-gradient(to bottom, #0a0212 0%, #120418 60%, transparent 100%)",
+          borderRadius: "0 0 60% 60%",
+          transform: "rotate(-10deg)",
+          zIndex: 0,
+        }}
+      />
+      {/* Hair right strand */}
+      <div
+        style={{
+          position: "absolute",
+          top: 26,
+          right: 1,
+          width: 20,
+          height: 115,
+          background:
+            "linear-gradient(to bottom, #0a0212 0%, #120418 60%, transparent 100%)",
+          borderRadius: "0 0 60% 60%",
+          transform: "rotate(10deg)",
+          zIndex: 0,
+        }}
+      />
+      {/* Hair glossy highlight streak */}
+      <div
+        style={{
+          position: "absolute",
+          top: 30,
+          left: "50%",
+          transform: "translateX(-50%) rotate(-5deg)",
+          width: 8,
+          height: 80,
+          background:
+            "linear-gradient(to bottom, rgba(120,60,220,0.35) 0%, rgba(80,20,160,0.15) 60%, transparent 100%)",
+          borderRadius: 8,
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* ── Crown base ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 6,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 54,
+          height: 13,
+          background:
+            "linear-gradient(to bottom, #f5d060 0%, #c9922b 50%, #a07010 100%)",
+          borderRadius: "3px 3px 0 0",
+          zIndex: 4,
+          boxShadow:
+            "0 0 10px rgba(245,208,96,0.6), 0 0 20px rgba(200,140,20,0.3), inset 0 2px 4px rgba(255,255,200,0.4)",
+        }}
+      />
+      {/* Crown spike far-left (short) */}
+      <div
+        style={{
+          position: "absolute",
+          top: -2,
+          left: "14%",
+          width: 0,
+          height: 0,
+          borderLeft: "5px solid transparent",
+          borderRight: "5px solid transparent",
+          borderBottom: "14px solid #c9922b",
+          zIndex: 4,
+          filter: "drop-shadow(0 0 4px rgba(245,208,96,0.8))",
+        }}
+      />
+      {/* Crown spike left (medium) */}
+      <div
+        style={{
+          position: "absolute",
+          top: -6,
+          left: "28%",
+          width: 0,
+          height: 0,
+          borderLeft: "6px solid transparent",
+          borderRight: "6px solid transparent",
+          borderBottom: "20px solid #d4a030",
+          zIndex: 4,
+          filter: "drop-shadow(0 0 5px rgba(245,208,96,0.9))",
+        }}
+      />
+      {/* Crown spike center (tallest) */}
+      <div
+        style={{
+          position: "absolute",
+          top: -14,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 0,
+          height: 0,
+          borderLeft: "8px solid transparent",
+          borderRight: "8px solid transparent",
+          borderBottom: "28px solid #f5d060",
+          zIndex: 4,
+          filter: "drop-shadow(0 0 8px rgba(245,220,80,1))",
+        }}
+      />
+      {/* Crown spike right (medium) */}
+      <div
+        style={{
+          position: "absolute",
+          top: -6,
+          right: "28%",
+          width: 0,
+          height: 0,
+          borderLeft: "6px solid transparent",
+          borderRight: "6px solid transparent",
+          borderBottom: "20px solid #d4a030",
+          zIndex: 4,
+          filter: "drop-shadow(0 0 5px rgba(245,208,96,0.9))",
+        }}
+      />
+      {/* Crown spike far-right (short) */}
+      <div
+        style={{
+          position: "absolute",
+          top: -2,
+          right: "14%",
+          width: 0,
+          height: 0,
+          borderLeft: "5px solid transparent",
+          borderRight: "5px solid transparent",
+          borderBottom: "14px solid #c9922b",
+          zIndex: 4,
+          filter: "drop-shadow(0 0 4px rgba(245,208,96,0.8))",
+        }}
+      />
+      {/* Crown center crimson gem */}
+      <div
+        style={{
+          position: "absolute",
+          top: 8,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 7,
+          height: 7,
+          background:
+            "radial-gradient(ellipse, #ff8888 0%, #cc0000 60%, #800000 100%)",
+          borderRadius: "50%",
+          zIndex: 5,
+          boxShadow: "0 0 6px rgba(255,0,0,0.9), 0 0 12px rgba(200,0,0,0.5)",
+        }}
+      />
+
+      {/* ── Head ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 16,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 50,
+          height: 58,
+          background:
+            "radial-gradient(ellipse at 38% 32%, #f0c0a0 0%, #e8b090 35%, #c48060 70%, #9a6040 100%)",
+          borderRadius: "50% 50% 44% 44%",
+          zIndex: 2,
+          boxShadow:
+            "inset -5px -7px 14px rgba(0,0,0,0.3), inset 3px 3px 8px rgba(255,220,180,0.25)",
+        }}
+      >
+        {/* Left eyebrow */}
+        <div
+          style={{
+            position: "absolute",
+            top: 13,
+            left: 7,
+            width: 14,
+            height: 2,
+            background: "#1a0a04",
+            borderRadius: "2px 2px 0 0",
+            transform: "rotate(-8deg)",
+          }}
+        />
+        {/* Right eyebrow */}
+        <div
+          style={{
+            position: "absolute",
+            top: 13,
+            right: 7,
+            width: 14,
+            height: 2,
+            background: "#1a0a04",
+            borderRadius: "2px 2px 0 0",
+            transform: "rotate(8deg)",
+          }}
+        />
+        {/* Left eye white */}
+        <div
+          style={{
+            position: "absolute",
+            top: 18,
+            left: 7,
+            width: 13,
+            height: 8,
+            background: "#fff8f8",
+            borderRadius: "50%",
+            boxShadow: "0 0 3px rgba(0,0,0,0.4)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Left iris */}
+          <div
+            style={{
+              position: "absolute",
+              top: 1,
+              left: 2,
+              width: 9,
+              height: 7,
+              background:
+                "radial-gradient(ellipse at 35% 30%, #ff6666 0%, #cc0000 50%, #7a0000 100%)",
+              borderRadius: "50%",
+              boxShadow: "0 0 5px rgba(200,0,0,0.7)",
+            }}
+          />
+          {/* Left pupil */}
+          <div
+            style={{
+              position: "absolute",
+              top: 2,
+              left: 4,
+              width: 5,
+              height: 5,
+              background: "#0a0000",
+              borderRadius: "50%",
+            }}
+          />
+          {/* Left eye glint */}
+          <div
+            style={{
+              position: "absolute",
+              top: 1,
+              left: 5,
+              width: 3,
+              height: 3,
+              background: "rgba(255,255,255,0.85)",
+              borderRadius: "50%",
+            }}
+          />
+        </div>
+        {/* Left eye lashes (top border) */}
+        <div
+          style={{
+            position: "absolute",
+            top: 17,
+            left: 7,
+            width: 13,
+            height: 3,
+            borderTop: "3px solid #0a0000",
+            borderRadius: "50% 50% 0 0",
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* Right eye white */}
+        <div
+          style={{
+            position: "absolute",
+            top: 18,
+            right: 7,
+            width: 13,
+            height: 8,
+            background: "#fff8f8",
+            borderRadius: "50%",
+            boxShadow: "0 0 3px rgba(0,0,0,0.4)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Right iris */}
+          <div
+            style={{
+              position: "absolute",
+              top: 1,
+              left: 2,
+              width: 9,
+              height: 7,
+              background:
+                "radial-gradient(ellipse at 35% 30%, #ff6666 0%, #cc0000 50%, #7a0000 100%)",
+              borderRadius: "50%",
+              boxShadow: "0 0 5px rgba(200,0,0,0.7)",
+            }}
+          />
+          {/* Right pupil */}
+          <div
+            style={{
+              position: "absolute",
+              top: 2,
+              left: 4,
+              width: 5,
+              height: 5,
+              background: "#0a0000",
+              borderRadius: "50%",
+            }}
+          />
+          {/* Right eye glint */}
+          <div
+            style={{
+              position: "absolute",
+              top: 1,
+              left: 5,
+              width: 3,
+              height: 3,
+              background: "rgba(255,255,255,0.85)",
+              borderRadius: "50%",
+            }}
+          />
+        </div>
+        {/* Right eye lashes */}
+        <div
+          style={{
+            position: "absolute",
+            top: 17,
+            right: 7,
+            width: 13,
+            height: 3,
+            borderTop: "3px solid #0a0000",
+            borderRadius: "50% 50% 0 0",
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* Nose hint */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 20,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 5,
+            height: 4,
+            borderBottom: "2px solid rgba(120,60,30,0.45)",
+            borderLeft: "1px solid rgba(120,60,30,0.3)",
+            borderRight: "1px solid rgba(120,60,30,0.3)",
+            borderRadius: "0 0 50% 50%",
+          }}
+        />
+
+        {/* Lips */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: showJaw ? 12 : 11,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 18,
+            height: showJaw ? 13 : 5,
+            background: showJaw
+              ? "#1a0000"
+              : "linear-gradient(to bottom, #cc2244 0%, #8b1a1a 60%, #6a1010 100%)",
+            borderRadius: showJaw ? "4px 4px 50% 50%" : "50% 50% 50% 50%",
+            transition: "height 0.1s ease",
+            overflow: "hidden",
+            boxShadow: showJaw
+              ? "none"
+              : "inset 0 2px 3px rgba(255,100,100,0.3)",
+            animation: showJaw
+              ? "jawChewSmooth 0.4s ease-in-out infinite alternate"
+              : "none",
+          }}
+        >
+          {/* Upper lip bow */}
+          {!showJaw && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: 10,
+                height: 3,
+                background: "rgba(255,160,160,0.4)",
+                borderRadius: "50%",
+              }}
+            />
+          )}
+          {showJaw && (
+            <div
+              style={{
+                position: "absolute",
+                top: 2,
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: 14,
+                height: 5,
+                background:
+                  "linear-gradient(to bottom, #cc2200 0%, #880000 100%)",
+                borderRadius: "0 0 4px 4px",
+              }}
+            />
+          )}
+        </div>
+
+        {/* Cheek blush left */}
+        <div
+          style={{
+            position: "absolute",
+            top: 26,
+            left: 4,
+            width: 10,
+            height: 6,
+            background:
+              "radial-gradient(ellipse, rgba(220,100,80,0.35), transparent 70%)",
+            borderRadius: "50%",
+          }}
+        />
+        {/* Cheek blush right */}
+        <div
+          style={{
+            position: "absolute",
+            top: 26,
+            right: 4,
+            width: 10,
+            height: 6,
+            background:
+              "radial-gradient(ellipse, rgba(220,100,80,0.35), transparent 70%)",
+            borderRadius: "50%",
+          }}
+        />
+      </div>
+
+      {/* ── Neck ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 72,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 22,
+          height: 12,
+          background: "linear-gradient(to bottom, #e0a880, #c48060)",
+          zIndex: 2,
+        }}
+      />
+      {/* Gold necklace */}
+      <div
+        style={{
+          position: "absolute",
+          top: 80,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 36,
+          height: 5,
+          background:
+            "linear-gradient(to right, transparent 0%, #c9922b 20%, #f5d060 50%, #c9922b 80%, transparent 100%)",
+          borderRadius: "0 0 8px 8px",
+          zIndex: 3,
+          boxShadow: "0 0 5px rgba(245,208,96,0.5)",
+        }}
+      />
+
+      {/* ── Left arm (skin + gold bracer) ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 84,
+          left: 4,
+          width: 14,
+          height: 52,
+          background:
+            "linear-gradient(to bottom, #e0a880 0%, #c48060 60%, #a06040 100%)",
+          borderRadius: "6px 6px 10px 10px",
+          transform: "rotate(-12deg)",
+          zIndex: 1,
+        }}
+      />
+      {/* Left bracer */}
+      <div
+        style={{
+          position: "absolute",
+          top: 118,
+          left: 4,
+          width: 14,
+          height: 10,
+          background:
+            "linear-gradient(to bottom, #f5d060 0%, #c9922b 50%, #a07010 100%)",
+          borderRadius: 4,
+          transform: "rotate(-12deg)",
+          zIndex: 2,
+          boxShadow: "0 0 5px rgba(245,208,96,0.5)",
+        }}
+      />
+
+      {/* ── Right arm (skin + gold bracer) ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 84,
+          right: 4,
+          width: 14,
+          height: 52,
+          background:
+            "linear-gradient(to bottom, #e0a880 0%, #c48060 60%, #a06040 100%)",
+          borderRadius: "6px 6px 10px 10px",
+          transform: "rotate(12deg)",
+          zIndex: 1,
+        }}
+      />
+      {/* Right bracer */}
+      <div
+        style={{
+          position: "absolute",
+          top: 118,
+          right: 4,
+          width: 14,
+          height: 10,
+          background:
+            "linear-gradient(to bottom, #f5d060 0%, #c9922b 50%, #a07010 100%)",
+          borderRadius: 4,
+          transform: "rotate(12deg)",
+          zIndex: 2,
+          boxShadow: "0 0 5px rgba(245,208,96,0.5)",
+        }}
+      />
+
+      {/* ── Armored corset ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 82,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 54,
+          height: 54,
+          background:
+            "linear-gradient(160deg, #c02040 0%, #8b0020 40%, #5a0018 100%)",
+          borderRadius: "8px 8px 4px 4px",
+          zIndex: 2,
+          boxShadow:
+            "inset 0 4px 10px rgba(255,160,100,0.2), inset 0 -4px 10px rgba(0,0,0,0.5), 0 0 8px rgba(180,20,40,0.3)",
+        }}
+      >
+        {/* Gold trim top edge */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background:
+              "linear-gradient(to right, #a07010, #f5d060 50%, #a07010)",
+            borderRadius: "8px 8px 0 0",
+          }}
+        />
+        {/* Vertical channel lines */}
+        <div
+          style={{
+            position: "absolute",
+            top: 6,
+            left: "30%",
+            width: 1,
+            height: 38,
+            background: "rgba(245,208,96,0.35)",
+            borderRadius: 1,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: 6,
+            right: "30%",
+            width: 1,
+            height: 38,
+            background: "rgba(245,208,96,0.35)",
+            borderRadius: 1,
+          }}
+        />
+        {/* Horizontal detail lines */}
+        <div
+          style={{
+            position: "absolute",
+            top: 18,
+            left: 8,
+            right: 8,
+            height: 1,
+            background: "rgba(245,208,96,0.3)",
+            borderRadius: 1,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: 34,
+            left: 8,
+            right: 8,
+            height: 1,
+            background: "rgba(245,208,96,0.25)",
+            borderRadius: 1,
+          }}
+        />
+        {/* Center gem cluster */}
+        {/* Left gold gem */}
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: "50%",
+            marginLeft: -13,
+            width: 7,
+            height: 7,
+            background:
+              "radial-gradient(ellipse, #fff0a0 0%, #f5d060 50%, #a07010 100%)",
+            borderRadius: "50%",
+            boxShadow: "0 0 5px rgba(245,208,96,0.8)",
+          }}
+        />
+        {/* Center crimson gem */}
+        <div
+          style={{
+            position: "absolute",
+            top: 6,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: 10,
+            height: 10,
+            background:
+              "radial-gradient(ellipse, #ff8888 0%, #cc0000 55%, #660000 100%)",
+            borderRadius: "50%",
+            boxShadow: "0 0 8px rgba(255,0,0,0.9), 0 0 16px rgba(200,0,0,0.4)",
+          }}
+        />
+        {/* Right gold gem */}
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: "50%",
+            marginLeft: 6,
+            width: 7,
+            height: 7,
+            background:
+              "radial-gradient(ellipse, #fff0a0 0%, #f5d060 50%, #a07010 100%)",
+            borderRadius: "50%",
+            boxShadow: "0 0 5px rgba(245,208,96,0.8)",
+          }}
+        />
+      </div>
+
+      {/* ── Skirt / Robe ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 133,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 72,
+          height: 68,
+          background:
+            "linear-gradient(160deg, #8b0038 0%, #5a0030 40%, #38001e 100%)",
+          borderRadius: "4px 4px 36px 36px",
+          zIndex: 2,
+          clipPath: "polygon(6% 0%, 94% 0%, 102% 100%, -2% 100%)",
+          boxShadow: "inset 0 4px 10px rgba(180,0,80,0.3)",
+        }}
+      />
+      {/* Gold hem border */}
+      <div
+        style={{
+          position: "absolute",
+          top: 194,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 80,
+          height: 4,
+          background:
+            "linear-gradient(to right, transparent 0%, #c9922b 15%, #f5d060 50%, #c9922b 85%, transparent 100%)",
+          zIndex: 3,
+          borderRadius: 2,
+          boxShadow: "0 0 6px rgba(245,208,96,0.5)",
+        }}
+      />
+      {/* Robe shimmer overlay */}
+      <div
+        style={{
+          position: "absolute",
+          top: 133,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 72,
+          height: 68,
+          background:
+            "linear-gradient(135deg, rgba(220,60,120,0.2) 0%, transparent 40%, rgba(100,0,60,0.3) 80%)",
+          zIndex: 2,
+          clipPath: "polygon(6% 0%, 94% 0%, 102% 100%, -2% 100%)",
+          pointerEvents: "none",
+        }}
+      />
+      {/* ── Running legs (visible below skirt) ── */}
+      {/* Left leg */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: "28%",
+          width: 14,
+          height: 40,
+          background: "linear-gradient(to bottom, #e0a880, #c48060)",
+          borderRadius: "4px 4px 6px 6px",
+          transformOrigin: "top center",
+          animation:
+            pose === "standing"
+              ? "leftLegRun 0.45s ease-in-out infinite"
+              : "none",
+          zIndex: 1,
+        }}
+      />
+      {/* Left boot */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: "25%",
+          width: 18,
+          height: 10,
+          background: "linear-gradient(to bottom, #1a0a0a, #0d0505)",
+          borderRadius: "3px 3px 5px 5px",
+          transformOrigin: "top center",
+          animation:
+            pose === "standing"
+              ? "leftLegRun 0.45s ease-in-out infinite"
+              : "none",
+          zIndex: 1,
+        }}
+      />
+      {/* Right leg */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          right: "28%",
+          width: 14,
+          height: 40,
+          background: "linear-gradient(to bottom, #e0a880, #c48060)",
+          borderRadius: "4px 4px 6px 6px",
+          transformOrigin: "top center",
+          animation:
+            pose === "standing"
+              ? "rightLegRun 0.45s ease-in-out infinite"
+              : "none",
+          zIndex: 1,
+        }}
+      />
+      {/* Right boot */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          right: "25%",
+          width: 18,
+          height: 10,
+          background: "linear-gradient(to bottom, #1a0a0a, #0d0505)",
+          borderRadius: "3px 3px 5px 5px",
+          transformOrigin: "top center",
+          animation:
+            pose === "standing"
+              ? "rightLegRun 0.45s ease-in-out infinite"
+              : "none",
+          zIndex: 1,
+        }}
+      />
+    </div>
+  );
+}
+// =====================
+// GameOverScreen
+// =====================
 function GameOverScreen({ onRestart }: { onRestart: () => void }) {
   const [phase, setPhase] = useState(0);
+  const [shaking, setShaking] = useState(false);
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase(1), 1500),
-      setTimeout(() => setPhase(2), 3200),
-      setTimeout(() => setPhase(3), 5200),
-      setTimeout(() => setPhase(4), 7500),
+      setTimeout(() => setPhase(1), 1000),
+      setTimeout(() => setPhase(2), 3000),
+      setTimeout(() => {
+        setShaking(true);
+        setTimeout(() => setShaking(false), 600);
+      }, 4200),
+      setTimeout(() => setPhase(3), 5500),
+      setTimeout(() => setPhase(4), 8000),
+      setTimeout(() => setPhase(5), 11000),
     ];
-    return () => timers.forEach(clearTimeout);
+    return () => {
+      timers.forEach(clearTimeout);
+    };
   }, []);
+
+  const candles = [
+    { left: "8%", delay: "0s" },
+    { left: "18%", delay: "0.4s" },
+    { left: "78%", delay: "0.2s" },
+    { left: "88%", delay: "0.7s" },
+  ];
+
+  const bloodSplats = [
+    { offsetX: -12, offsetY: 8, size: 28, delay: "0.05s" },
+    { offsetX: 14, offsetY: 12, size: 20, delay: "0.1s" },
+    { offsetX: 0, offsetY: 20, size: 36, delay: "0s" },
+    { offsetX: -22, offsetY: 16, size: 16, delay: "0.15s" },
+    { offsetX: 24, offsetY: 4, size: 22, delay: "0.08s" },
+  ];
+
+  const burstRays = Array.from({ length: 10 }, (_, i) => ({
+    angle: i * 36,
+    length: 40 + (i % 3) * 20,
+    delay: `${i * 0.07}s`,
+  }));
+
+  const caption =
+    phase === 1
+      ? "She drags you to her lair..."
+      : phase === 2
+        ? "She HURLS you across the room!"
+        : phase === 3
+          ? "She slowly lies down on you..."
+          : phase === 4
+            ? "She feasts on you..."
+            : "";
 
   return (
     <div
       className="overlay-screen gameover-overlay"
-      style={{ overflow: "hidden" }}
+      style={{
+        overflow: "hidden",
+        background:
+          "linear-gradient(to bottom, #0a0005 0%, #1a0008 40%, #0d0003 100%)",
+        animation: shaking ? "screenShake 0.5s ease-in-out" : "none",
+      }}
     >
-      {/* Phase 0: Initial text */}
-      <div
-        className="overlay-title"
-        style={{
-          transition: "opacity 1s",
-          opacity: phase >= 1 ? 0.3 : 1,
-          fontSize: "clamp(1.8rem, 4vw, 3.5rem)",
-        }}
-      >
-        You couldn't escape...
-      </div>
-
-      {/* Nitya descend + lie down + eat animation */}
+      {/* Stone wall brick pattern */}
       <div
         style={{
           position: "absolute",
           top: 0,
           left: 0,
           width: "100%",
-          height: "100%",
+          height: "55%",
+          background:
+            "repeating-linear-gradient(0deg, transparent, transparent 34px, rgba(40,5,10,0.5) 34px, rgba(40,5,10,0.5) 36px)," +
+            "repeating-linear-gradient(90deg, transparent, transparent 58px, rgba(40,5,10,0.4) 58px, rgba(40,5,10,0.4) 60px)",
+          opacity: phase >= 1 ? 1 : 0,
+          transition: "opacity 1.5s",
+          zIndex: 1,
           pointerEvents: "none",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
         }}
-      >
-        {/* Nitya figure */}
-        {phase >= 1 && (
-          <div
-            className={
-              phase === 1
-                ? "nitya-descend"
-                : phase === 2
-                  ? "nitya-liedown"
-                  : "nitya-eating"
-            }
-            style={{
-              position: "absolute",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              fontSize: "6rem",
-              filter: "drop-shadow(0 0 20px rgba(200,0,0,0.9))",
-              zIndex: 5,
-            }}
-          >
-            <span
-              style={{
-                fontSize: phase >= 2 ? "8rem" : "6rem",
-                transition: "font-size 0.8s",
-              }}
-            >
-              {phase >= 3 ? "👹" : "👸"}
-            </span>
-            {phase >= 2 && (
-              <div
-                style={{
-                  fontSize: "2rem",
-                  color: "rgba(220,30,30,0.9)",
-                  fontFamily: "'Fraunces', serif",
-                  textAlign: "center",
-                  marginTop: "0.3rem",
-                  animation: "fadeInSad 0.6s ease-in",
-                }}
-              >
-                {phase >= 3 ? "...and feasts." : "Nitya lies upon you..."}
-              </div>
-            )}
-          </div>
-        )}
+      />
 
-        {/* Player lying flat */}
-        {phase >= 2 && (
+      {/* Floor */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          width: "100%",
+          height: "35%",
+          background:
+            "linear-gradient(to top, #0a0003 0%, #140008 60%, transparent 100%)",
+          opacity: phase >= 1 ? 1 : 0,
+          transition: "opacity 1.5s",
+          zIndex: 1,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Candles */}
+      {candles.map((c) => (
+        <div
+          key={c.left}
+          style={{
+            position: "absolute",
+            bottom: "30%",
+            left: c.left,
+            zIndex: 3,
+            opacity: phase >= 1 ? 1 : 0,
+            transition: "opacity 1s",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
           <div
             style={{
-              position: "absolute",
-              bottom: "28%",
-              fontSize: "4rem",
-              animation: "playerFlat 0.5s ease-out forwards",
-              filter: "drop-shadow(0 0 8px rgba(150,0,0,0.7))",
-              zIndex: 4,
+              width: 8,
+              height: 14,
+              background:
+                "radial-gradient(ellipse at 50% 70%, #ff9900, #ff4400, transparent)",
+              borderRadius: "50% 50% 30% 30%",
+              animation: "flickerCandle 1.2s ease-in-out infinite",
+              animationDelay: c.delay,
+              boxShadow: "0 0 12px 4px rgba(255,120,0,0.5)",
             }}
-          >
-            🫥
-          </div>
-        )}
-
-        {/* Blood splatter */}
-        {phase >= 3 && (
+          />
           <div
             style={{
-              position: "absolute",
-              width: "100%",
-              height: "100%",
-              zIndex: 3,
-              pointerEvents: "none",
+              width: 10,
+              height: 30,
+              background: "linear-gradient(to bottom, #d4c4a0, #a08060)",
+              borderRadius: "2px 2px 0 0",
+              boxShadow: "0 0 8px rgba(255,120,0,0.3)",
             }}
-          >
-            {["10%", "30%", "55%", "75%", "90%", "20%", "65%"].map(
-              (left, i) => (
-                <div
-                  key={left}
-                  className="blood-drop"
-                  style={{
-                    left,
-                    animationDelay: `${i * 0.18}s`,
-                    fontSize: `${1.2 + (i % 3) * 0.4}rem`,
-                  }}
-                >
-                  🩸
-                </div>
-              ),
-            )}
-          </div>
-        )}
-      </div>
+          />
+        </div>
+      ))}
 
-      {/* Phase 4: Final sad message + restart */}
+      {/* Candle ambient glow */}
+      {phase >= 1 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "radial-gradient(ellipse at 10% 70%, rgba(180,80,0,0.12) 0%, transparent 35%)," +
+              "radial-gradient(ellipse at 90% 70%, rgba(180,80,0,0.12) 0%, transparent 35%)",
+            animation: "flickerCandle 2s ease-in-out infinite",
+            zIndex: 2,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      {/* Crimson vignette */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            phase >= 4
+              ? "radial-gradient(ellipse at center, rgba(100,0,0,0.5) 0%, rgba(0,0,0,0.97) 80%)"
+              : "radial-gradient(ellipse at center, rgba(30,0,0,0.3) 0%, rgba(0,0,0,0.7) 80%)",
+          transition: "background 2s",
+          zIndex: 6,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Phase 4: Pulsing red screen overlay */}
       {phase >= 4 && (
         <div
           style={{
             position: "absolute",
-            bottom: "12%",
+            inset: 0,
+            background: "rgba(120,0,0,0.18)",
+            animation: "feastScreenPulse 0.8s ease-in-out infinite alternate",
+            zIndex: 7,
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      {/* Phase 0: Darkness intro text */}
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          textAlign: "center",
+          zIndex: 10,
+          opacity: phase === 0 ? 1 : 0,
+          transition: "opacity 0.8s",
+          pointerEvents: "none",
+          padding: "0 2rem",
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "'Fraunces', serif",
+            fontSize: "clamp(1.4rem, 3.5vw, 2.8rem)",
+            color: "rgba(200,50,50,0.95)",
+            textShadow: "0 0 30px rgba(200,0,0,0.8)",
+            lineHeight: 1.4,
+          }}
+        >
+          No escape...
+          <br />
+          <span style={{ fontSize: "0.65em", color: "rgba(180,100,100,0.8)" }}>
+            Nitya takes you to her chamber.
+          </span>
+        </div>
+      </div>
+
+      {/* Scene (phases 1-4) */}
+      {phase >= 1 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 4,
+            pointerEvents: "none",
+          }}
+        >
+          {/* Caption */}
+          {caption && (
+            <div
+              key={phase}
+              style={{
+                position: "absolute",
+                top: "7%",
+                left: "50%",
+                transform: "translateX(-50%)",
+                fontSize: "clamp(0.9rem, 2.2vw, 1.5rem)",
+                color: "rgba(230,70,70,0.95)",
+                fontFamily: "'Fraunces', serif",
+                textAlign: "center",
+                letterSpacing: "0.04em",
+                animation: "fadeInSad 0.7s ease-in",
+                textShadow: "0 0 18px rgba(200,0,0,0.9)",
+                zIndex: 9,
+                padding: "0 1.5rem",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {caption}
+            </div>
+          )}
+
+          {/* Phase 1: Nitya drags player from left */}
+          {phase === 1 && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "22%",
+                animation:
+                  "nityaDragEnter 2.2s cubic-bezier(0.22,1,0.36,1) forwards",
+                display: "flex",
+                alignItems: "flex-end",
+                gap: 14,
+              }}
+            >
+              {/* Limp player silhouette being dragged on floor */}
+              <div
+                style={{
+                  marginBottom: 8,
+                  animation: "playerDragged 0.4s ease-in-out infinite",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  opacity: 0.85,
+                }}
+              >
+                {/* Head */}
+                <div
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "radial-gradient(ellipse, #4a2020, #2a1010)",
+                    boxShadow: "0 0 6px rgba(120,0,0,0.5)",
+                    marginBottom: 2,
+                    marginLeft: 8,
+                  }}
+                />
+                {/* Limp body horizontal */}
+                <div
+                  style={{
+                    width: 44,
+                    height: 12,
+                    background: "linear-gradient(to right, #2a1010, #1a0808)",
+                    borderRadius: 4,
+                    boxShadow: "0 2px 8px rgba(100,0,0,0.4)",
+                  }}
+                />
+                {/* Legs splayed out */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginTop: 2,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 5,
+                      height: 18,
+                      background: "#2a1010",
+                      borderRadius: 3,
+                      transform: "rotate(-20deg)",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: 5,
+                      height: 18,
+                      background: "#2a1010",
+                      borderRadius: 3,
+                      transform: "rotate(20deg)",
+                    }}
+                  />
+                </div>
+              </div>
+              {/* Nitya CSS figure striding in */}
+              <div
+                style={{
+                  animation: "nityaStride 0.5s ease-in-out infinite",
+                  filter: "drop-shadow(0 0 16px rgba(200,0,0,0.9))",
+                }}
+              >
+                <NityaFigure pose="standing" />
+              </div>
+            </div>
+          )}
+
+          {/* Phase 2: Throw */}
+          {phase === 2 && (
+            <>
+              {/* Nitya winding up + throwing */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "18%",
+                  left: "25%",
+                  transform: "translateX(-50%)",
+                  animation: "nityaThrowWindup 2.5s ease-in-out forwards",
+                  filter: "drop-shadow(0 0 22px rgba(220,0,0,0.95))",
+                  zIndex: 5,
+                }}
+              >
+                <NityaFigure pose="standing" />
+              </div>
+              {/* Player flying through air in parabolic arc */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: "40%",
+                  left: "20%",
+                  zIndex: 6,
+                  animation:
+                    "throwPlayerArc 2.0s cubic-bezier(0.3,0,0.7,1) forwards",
+                  transformOrigin: "center center",
+                }}
+              >
+                {/* Player spinning silhouette */}
+                <div style={{ animation: "playerSpin 0.3s linear infinite" }}>
+                  <div
+                    style={{
+                      width: 18,
+                      height: 18,
+                      borderRadius: "50%",
+                      background: "radial-gradient(ellipse, #4a2020, #2a1010)",
+                      margin: "0 auto",
+                      boxShadow: "0 0 8px rgba(150,0,0,0.5)",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: 12,
+                      height: 24,
+                      background: "#3a1a1a",
+                      margin: "2px auto 0",
+                      borderRadius: 3,
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: 5,
+                      marginTop: 2,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 5,
+                        height: 12,
+                        background: "#2a1010",
+                        borderRadius: 3,
+                      }}
+                    />
+                    <div
+                      style={{
+                        width: 5,
+                        height: 12,
+                        background: "#2a1010",
+                        borderRadius: 3,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Crashed player + blood splats (phase 2+ after impact) */}
+          {phase >= 2 && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "22%",
+                right: "18%",
+                zIndex: 4,
+                opacity: phase === 2 ? 0 : 1,
+                transition: "opacity 0.3s",
+                transitionDelay: "1.8s",
+              }}
+            >
+              {bloodSplats.map((s) => (
+                <div
+                  key={`splat-${s.offsetX}-${s.offsetY}`}
+                  style={{
+                    position: "absolute",
+                    left: s.offsetX,
+                    top: s.offsetY,
+                    width: s.size,
+                    height: s.size,
+                    borderRadius: "50%",
+                    background:
+                      "radial-gradient(ellipse, #8b0000 0%, #5a0000 60%, transparent 100%)",
+                    animation:
+                      "bloodSplat 0.6s cubic-bezier(0.22,1,0.36,1) forwards",
+                    animationDelay: s.delay,
+                    transform: "scale(0)",
+                    opacity: 0.9,
+                  }}
+                />
+              ))}
+              {/* Head */}
+              <div
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  background: "#3a1a1a",
+                  position: "absolute",
+                  left: -12,
+                  top: 4,
+                  boxShadow: "0 0 8px rgba(120,0,0,0.6)",
+                }}
+              />
+              {/* Flat body */}
+              <div
+                style={{
+                  width: 52,
+                  height: 14,
+                  background: "linear-gradient(to right, #2a1010, #1a0808)",
+                  borderRadius: 4,
+                  animation: "crash 0.4s ease-out forwards",
+                  boxShadow:
+                    "0 4px 12px rgba(0,0,0,0.8), 0 0 16px rgba(120,0,0,0.4)",
+                }}
+              />
+            </div>
+          )}
+
+          {/* Phase 3: Nitya slowly lies down */}
+          {phase === 3 && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "20%",
+                right: "12%",
+                zIndex: 5,
+                animation:
+                  "nityaApproachAndLieDown 3.2s cubic-bezier(0.55,0,0.8,0.45) forwards",
+                transformOrigin: "bottom center",
+                filter: "drop-shadow(0 0 22px rgba(180,0,0,0.85))",
+              }}
+            >
+              <NityaFigure pose="standing" />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: "-24px",
+                  borderRadius: "50%",
+                  background:
+                    "radial-gradient(ellipse, rgba(150,0,0,0.3) 0%, transparent 70%)",
+                  animation: "feastPulse 1.8s ease-in-out infinite alternate",
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
+          )}
+
+          {/* Phase 4: Feast - Nitya lying flat on player */}
+          {phase >= 4 && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "18%",
+                right: "8%",
+                zIndex: 5,
+                transformOrigin: "bottom center",
+              }}
+            >
+              {/* Nitya lying flat, pulsing */}
+              <div
+                style={{
+                  animation: "lyingBodyPulse 0.5s ease-in-out infinite",
+                  filter: "drop-shadow(0 0 28px rgba(220,0,0,0.95))",
+                }}
+              >
+                <NityaFigure pose="lying" showJaw={phase >= 4} />
+              </div>
+
+              {/* Spreading blood pool under her */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: -10,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 200,
+                  height: 80,
+                  borderRadius: "50%",
+                  background:
+                    "radial-gradient(ellipse, rgba(160,0,0,0.9) 0%, rgba(100,0,0,0.6) 50%, transparent 100%)",
+                  animation: "bloodSpread 3s ease-out forwards",
+                  zIndex: -1,
+                }}
+              />
+              {/* Secondary blood blob */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: "20%",
+                  width: 120,
+                  height: 50,
+                  borderRadius: "50%",
+                  background:
+                    "radial-gradient(ellipse, rgba(140,0,0,0.8) 0%, transparent 80%)",
+                  animation: "bloodSpread 4s 0.5s ease-out forwards",
+                  zIndex: -1,
+                }}
+              />
+
+              {/* Blood burst rays */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 20,
+                  right: 20,
+                  width: 0,
+                  height: 0,
+                  zIndex: 6,
+                }}
+              >
+                {burstRays.map((ray) => (
+                  <div
+                    key={ray.angle}
+                    style={{
+                      position: "absolute",
+                      width: ray.length,
+                      height: 3,
+                      background:
+                        "linear-gradient(to right, rgba(160,0,0,0.9), transparent)",
+                      transformOrigin: "left center",
+                      transform: `rotate(${ray.angle}deg)`,
+                      animation: "bloodSplat 0.5s ease-out infinite alternate",
+                      animationDelay: ray.delay,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Phase 4: Blood pool under player on ground */}
+          {phase >= 4 && (
+            <div
+              style={{
+                position: "absolute",
+                bottom: "16%",
+                right: "14%",
+                width: 160,
+                height: 60,
+                borderRadius: "50%",
+                background:
+                  "radial-gradient(ellipse, rgba(160,0,0,0.85) 0%, transparent 80%)",
+                animation: "bloodPoolGrow 3s ease-out forwards",
+                zIndex: 3,
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Phase 5: GAME OVER */}
+      {phase >= 5 && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: "1rem",
-            animation: "fadeInSad 1s ease-in",
-            zIndex: 10,
+            justifyContent: "center",
+            zIndex: 20,
+            background: "rgba(0,0,0,0.6)",
+            animation: "fadeInSad 1.2s ease-in",
           }}
         >
-          <div className="horror-divider" style={{ width: "260px" }} />
           <div
             style={{
-              color: "rgba(200,80,80,0.85)",
               fontFamily: "'Fraunces', serif",
-              fontSize: "1.1rem",
+              fontSize: "clamp(3rem, 9vw, 7rem)",
+              fontWeight: 900,
+              color: "#cc0000",
+              textShadow:
+                "0 0 40px rgba(220,0,0,0.9), 0 0 80px rgba(180,0,0,0.6), 2px 2px 0 #000",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              lineHeight: 1,
+              marginBottom: "1.5rem",
+              animation: "titlePulse 2s ease-in-out infinite",
+            }}
+          >
+            GAME OVER
+          </div>
+          <div
+            className="horror-divider"
+            style={{ width: "min(380px, 80vw)" }}
+          />
+          <div
+            style={{
+              color: "rgba(200,80,80,0.9)",
+              fontFamily: "'Fraunces', serif",
+              fontSize: "clamp(0.85rem, 1.8vw, 1.1rem)",
               textAlign: "center",
-              lineHeight: 1.6,
-              maxWidth: "320px",
+              lineHeight: 1.8,
+              marginTop: "1rem",
+              marginBottom: "2rem",
+              maxWidth: "min(420px, 88vw)",
             }}
           >
             There was no one left to remember you.
@@ -2506,6 +3919,23 @@ function VictoryScreen({
 }
 
 // =====================
+// =====================
+// Rotate Overlay
+// =====================
+function RotateOverlay() {
+  return (
+    <div className="rotate-overlay" data-ocid="rotate.panel">
+      <div className="rotate-overlay-icon">
+        <div className="rotate-overlay-phone" />
+        <div className="rotate-overlay-arrow" />
+      </div>
+      <div className="rotate-overlay-divider" />
+      <div className="rotate-overlay-title">Rotate Your Device</div>
+      <div className="rotate-overlay-sub">Landscape mode required to play</div>
+    </div>
+  );
+}
+
 // App
 // =====================
 export default function App() {
@@ -2595,102 +4025,106 @@ export default function App() {
   const isPlaying = gameState.phase === "playing";
 
   return (
-    <div className="game-container">
-      <Canvas
-        camera={{
-          position: [0, PLAYER_HEIGHT, 10],
-          fov: 75,
-          near: 0.1,
-          far: 100,
-        }}
-        shadows
-        gl={{ antialias: true }}
-        style={{ background: "#050208" }}
-      >
-        <Scene
-          gameState={gameState}
-          onItemCollect={handleItemCollect}
-          onCatch={handleCatch}
-          onEscape={handleEscape}
+    <>
+      <RotateOverlay />
+      <div className="game-container">
+        <Canvas
+          camera={{
+            position: [0, PLAYER_HEIGHT, 10],
+            fov: 75,
+            near: 0.1,
+            far: 100,
+          }}
+          shadows
+          gl={{ antialias: window.devicePixelRatio <= 1 }}
+          dpr={Math.min(window.devicePixelRatio, 1.5)}
+          style={{ background: "#050208" }}
+        >
+          <Scene
+            gameState={gameState}
+            onItemCollect={handleItemCollect}
+            onCatch={handleCatch}
+            onEscape={handleEscape}
+            playerPosRef={playerPosRef}
+            ghostPosRef={ghostPosRef}
+            collectedItems={collectedItems}
+            touchMoveRef={touchMoveRef}
+            touchYawRef={touchYawRef}
+            touchPitchRef={touchPitchRef}
+          />
+        </Canvas>
+
+        <HUD gameState={gameState} collectedItems={collectedItems} />
+
+        <Minimap
           playerPosRef={playerPosRef}
           ghostPosRef={ghostPosRef}
           collectedItems={collectedItems}
-          touchMoveRef={touchMoveRef}
-          touchYawRef={touchYawRef}
-          touchPitchRef={touchPitchRef}
+          gameState={gameState}
         />
-      </Canvas>
 
-      <HUD gameState={gameState} collectedItems={collectedItems} />
+        {/* Mobile touch controls — only rendered on touch devices during gameplay */}
+        {IS_TOUCH_DEVICE && isPlaying && (
+          <>
+            <VirtualJoystick touchMoveRef={touchMoveRef} visible={true} />
+            <TouchLookZone
+              yawRef={touchYawRef}
+              pitchRef={touchPitchRef}
+              visible={true}
+            />
+          </>
+        )}
 
-      <Minimap
-        playerPosRef={playerPosRef}
-        ghostPosRef={ghostPosRef}
-        collectedItems={collectedItems}
-        gameState={gameState}
-      />
-
-      {/* Mobile touch controls — only rendered on touch devices during gameplay */}
-      {IS_TOUCH_DEVICE && isPlaying && (
-        <>
-          <VirtualJoystick touchMoveRef={touchMoveRef} visible={true} />
-          <TouchLookZone
-            yawRef={touchYawRef}
-            pitchRef={touchPitchRef}
-            visible={true}
+        {gameState.phase === "start" && (
+          <StartScreen
+            onStart={handleStart}
+            onCharacters={handleShowCharacters}
           />
-        </>
-      )}
+        )}
+        {gameState.phase === "characters" && (
+          <CharactersScreen onBack={handleBackToStart} />
+        )}
+        {gameState.phase === "death" && (
+          <DeathScreen
+            daysLeft={gameState.daysLeft}
+            onContinue={handleContinue}
+          />
+        )}
+        {gameState.phase === "gameover" && (
+          <GameOverScreen onRestart={handleRestart} />
+        )}
+        {gameState.phase === "victory" && (
+          <VictoryScreen
+            daysLeft={gameState.daysLeft}
+            onRestart={handleRestart}
+          />
+        )}
 
-      {gameState.phase === "start" && (
-        <StartScreen
-          onStart={handleStart}
-          onCharacters={handleShowCharacters}
-        />
-      )}
-      {gameState.phase === "characters" && (
-        <CharactersScreen onBack={handleBackToStart} />
-      )}
-      {gameState.phase === "death" && (
-        <DeathScreen
-          daysLeft={gameState.daysLeft}
-          onContinue={handleContinue}
-        />
-      )}
-      {gameState.phase === "gameover" && (
-        <GameOverScreen onRestart={handleRestart} />
-      )}
-      {gameState.phase === "victory" && (
-        <VictoryScreen
-          daysLeft={gameState.daysLeft}
-          onRestart={handleRestart}
-        />
-      )}
-
-      <div
-        style={{
-          position: "absolute",
-          bottom: 10,
-          left: "50%",
-          transform: "translateX(-50%)",
-          fontSize: "0.6rem",
-          color: "rgba(200,150,120,0.3)",
-          letterSpacing: "0.1em",
-          pointerEvents: "none",
-          zIndex: 5,
-          whiteSpace: "nowrap",
-        }}
-      >
-        © {new Date().getFullYear()}. Built with ♥ using{" "}
-        <a
-          href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
-          style={{ color: "rgba(200,150,120,0.4)", pointerEvents: "all" }}
-          target="_blank"
-          rel="noreferrer"
+        <div
+          style={{
+            position: "absolute",
+            bottom: 10,
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontSize: "0.6rem",
+            color: "rgba(200,150,120,0.3)",
+            letterSpacing: "0.1em",
+            pointerEvents: "none",
+            zIndex: 5,
+            whiteSpace: "nowrap",
+          }}
         >
-          caffeine.ai
-        </a>
+          © {new Date().getFullYear()}. Built with ♥ using{" "}
+          <a
+            href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
+            style={{ color: "rgba(200,150,120,0.4)", pointerEvents: "all" }}
+            target="_blank"
+            rel="noreferrer"
+          >
+            caffeine.ai
+          </a>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
