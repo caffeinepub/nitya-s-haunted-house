@@ -33,25 +33,25 @@ interface TouchMove {
 const TOTAL_ITEMS = 4;
 const PLAYER_HEIGHT = 1.7;
 const PLAYER_SPEED = 5;
-const GHOST_DEATH_RADIUS = 1.8;
+const GHOST_DEATH_RADIUS = 1.2;
 const ROOM_HEIGHT = 4;
 const LOOK_SENSITIVITY = 0.003;
 
 // Item positions
 const ITEM_POSITIONS: { id: string; pos: [number, number, number] }[] = [
-  { id: "item-n-west", pos: [-8, 1.2, -8] },
-  { id: "item-n-east", pos: [8, 1.2, -8] },
-  { id: "item-s-west", pos: [-8, 1.2, 8] },
-  { id: "item-center", pos: [4, 1.2, 2] },
+  { id: "item-grand-hall", pos: [-8, 1.2, 4] },
+  { id: "item-right-wing", pos: [10, 1.2, -8] },
+  { id: "item-far-left", pos: [-9, 1.2, -18] },
+  { id: "item-far-right", pos: [9, 1.2, -18] },
 ];
 
-const GATE_POS: [number, number, number] = [0, 0, -18];
+const GATE_POS: [number, number, number] = [0, 0, -20];
 
 // World bounds for minimap
-const MAP_X_MIN = -12;
-const MAP_X_MAX = 12;
-const MAP_Z_MIN = -20;
-const MAP_Z_MAX = 15;
+const MAP_X_MIN = -15;
+const MAP_X_MAX = 15;
+const MAP_Z_MIN = -22;
+const MAP_Z_MAX = 18;
 
 // =====================
 // Mobile detection (stable, not reactive)
@@ -70,136 +70,151 @@ interface WallDef {
 }
 
 const WALLS: WallDef[] = [
+  // === OUTER BOUNDARY ===
   {
     id: "wall-north",
-    pos: [0, ROOM_HEIGHT / 2, -20],
-    size: [24, ROOM_HEIGHT, 0.5],
+    pos: [0, ROOM_HEIGHT / 2, -22],
+    size: [30, ROOM_HEIGHT, 0.5],
   },
   {
     id: "wall-south",
-    pos: [0, ROOM_HEIGHT / 2, 15],
-    size: [24, ROOM_HEIGHT, 0.5],
+    pos: [0, ROOM_HEIGHT / 2, 18],
+    size: [30, ROOM_HEIGHT, 0.5],
   },
   {
     id: "wall-west",
-    pos: [-12, ROOM_HEIGHT / 2, -2.5],
-    size: [0.5, ROOM_HEIGHT, 35],
+    pos: [-15, ROOM_HEIGHT / 2, -2],
+    size: [0.5, ROOM_HEIGHT, 40],
   },
   {
     id: "wall-east",
-    pos: [12, ROOM_HEIGHT / 2, -2.5],
-    size: [0.5, ROOM_HEIGHT, 35],
+    pos: [15, ROOM_HEIGHT / 2, -2],
+    size: [0.5, ROOM_HEIGHT, 40],
+  },
+
+  // === ENTRY CORRIDOR SIDE WALLS (x:-3 to 3, z:10 to 18) ===
+  {
+    id: "wall-entry-w",
+    pos: [-3, ROOM_HEIGHT / 2, 14],
+    size: [0.5, ROOM_HEIGHT, 8],
   },
   {
-    id: "wall-div-mid-left",
-    pos: [-8, ROOM_HEIGHT / 2, -5],
-    size: [8, ROOM_HEIGHT, 0.5],
+    id: "wall-entry-e",
+    pos: [3, ROOM_HEIGHT / 2, 14],
+    size: [0.5, ROOM_HEIGHT, 8],
+  },
+
+  // === GRAND HALL SOUTH WALL (z=10, gap x:-3 to 3 for entry) ===
+  {
+    id: "wall-hall-s-w",
+    pos: [-9, ROOM_HEIGHT / 2, 10],
+    size: [12, ROOM_HEIGHT, 0.5],
   },
   {
-    id: "wall-div-mid-right",
-    pos: [8, ROOM_HEIGHT / 2, -5],
-    size: [8, ROOM_HEIGHT, 0.5],
+    id: "wall-hall-s-e",
+    pos: [9, ROOM_HEIGHT / 2, 10],
+    size: [12, ROOM_HEIGHT, 0.5],
+  },
+
+  // === GRAND HALL NORTH WALL (z=-2, gaps: x:-11 to -9 left wing door, x:-3 to 3 corridor, x:9 to 11 right wing door) ===
+  {
+    id: "wall-hall-n-w1",
+    pos: [-13, ROOM_HEIGHT / 2, -2],
+    size: [4, ROOM_HEIGHT, 0.5],
   },
   {
-    id: "wall-div-s-left",
-    pos: [-8, ROOM_HEIGHT / 2, 5],
-    size: [8, ROOM_HEIGHT, 0.5],
+    id: "wall-hall-n-w2",
+    pos: [-6, ROOM_HEIGHT / 2, -2],
+    size: [6, ROOM_HEIGHT, 0.5],
   },
   {
-    id: "wall-div-s-right",
-    pos: [8, ROOM_HEIGHT / 2, 5],
-    size: [8, ROOM_HEIGHT, 0.5],
+    id: "wall-hall-n-e1",
+    pos: [6, ROOM_HEIGHT / 2, -2],
+    size: [6, ROOM_HEIGHT, 0.5],
   },
   {
-    id: "wall-corr-l",
-    pos: [-4, ROOM_HEIGHT / 2, 0],
-    size: [0.5, ROOM_HEIGHT, 10],
+    id: "wall-hall-n-e2",
+    pos: [13, ROOM_HEIGHT / 2, -2],
+    size: [4, ROOM_HEIGHT, 0.5],
+  },
+
+  // === NORTH CORRIDOR SIDE WALLS (x=-3 and x=3, z:-14 to -2) ===
+  {
+    id: "wall-ncorr-l",
+    pos: [-3, ROOM_HEIGHT / 2, -8],
+    size: [0.5, ROOM_HEIGHT, 12],
   },
   {
-    id: "wall-corr-r",
-    pos: [4, ROOM_HEIGHT / 2, 0],
-    size: [0.5, ROOM_HEIGHT, 10],
+    id: "wall-ncorr-r",
+    pos: [3, ROOM_HEIGHT / 2, -8],
+    size: [0.5, ROOM_HEIGHT, 12],
+  },
+
+  // === WING/CHAMBER DIVIDER (z=-14, gaps: x:-10 to -8, x:-3 to 3, x:8 to 10) ===
+  {
+    id: "wall-mid-w1",
+    pos: [-12.5, ROOM_HEIGHT / 2, -14],
+    size: [5, ROOM_HEIGHT, 0.5],
   },
   {
-    id: "wall-north-l",
-    pos: [-2, ROOM_HEIGHT / 2, -12],
-    size: [0.5, ROOM_HEIGHT, 16],
+    id: "wall-mid-w2",
+    pos: [-5.5, ROOM_HEIGHT / 2, -14],
+    size: [5, ROOM_HEIGHT, 0.5],
   },
   {
-    id: "wall-north-r",
-    pos: [2, ROOM_HEIGHT / 2, -12],
-    size: [0.5, ROOM_HEIGHT, 16],
+    id: "wall-mid-e1",
+    pos: [5.5, ROOM_HEIGHT / 2, -14],
+    size: [5, ROOM_HEIGHT, 0.5],
+  },
+  {
+    id: "wall-mid-e2",
+    pos: [12.5, ROOM_HEIGHT / 2, -14],
+    size: [5, ROOM_HEIGHT, 0.5],
+  },
+
+  // === FAR NORTH CENTER DIVIDER (x=0, z:-22 to -14) ===
+  {
+    id: "wall-farn-div",
+    pos: [0, ROOM_HEIGHT / 2, -18],
+    size: [0.5, ROOM_HEIGHT, 8],
   },
 ];
 
 // =====================
-// Wall Material with Procedural Cracks
+// Wall Material - concrete color with emissive cracks
 // =====================
 function WallMaterial({ seed }: { seed: number }) {
-  const matRef = useRef<THREE.MeshStandardMaterial>(null!);
+  // Blood-stained dark stone, varied per wall
+  const baseShades = ["#2d0a08", "#3a0e0c", "#2a0806", "#320c0a", "#2f0b09"];
+  const hex = baseShades[Math.abs(Math.round(seed)) % baseShades.length];
+  return (
+    <meshStandardMaterial
+      color={hex}
+      roughness={0.95}
+      metalness={0.0}
+      emissive="#6b0000"
+      emissiveIntensity={0.12 + (seed % 4) * 0.03}
+    />
+  );
+}
 
-  useEffect(() => {
-    const mat = matRef.current;
-    if (!mat) return;
-
-    // Vary color slightly based on seed
-    const t = (seed % 7) / 7;
-    const r = 0x1c + Math.floor(t * 4);
-    const g = 0x14 + Math.floor(t * 4);
-    const b = 0x10 + Math.floor(t * 4);
-    mat.color.setRGB(r / 255, g / 255, b / 255);
-    mat.roughness = 0.85 + (seed % 3) * 0.05;
-    mat.emissive.setRGB(0, 0, 0);
-
-    mat.onBeforeCompile = (shader) => {
-      shader.uniforms.uSeed = { value: seed };
-
-      // Inject crack pattern into fragment shader
-      shader.fragmentShader = shader.fragmentShader.replace(
-        "#include <emissivemap_fragment>",
-        `#include <emissivemap_fragment>
-        {
-          // Procedural crack emissive
-          uniform float uSeed;
-          vec2 uv = vUv * 6.0 + uSeed * 0.37;
-
-          // Domain warp
-          float wx = sin(uv.y * 8.3 + uSeed * 1.7) * 0.18;
-          float wy = cos(uv.x * 7.1 + uSeed * 2.3) * 0.18;
-          vec2 warped = uv + vec2(wx, wy);
-
-          // Voronoi-like crack: distance to nearest cell edge
-          vec2 cell = floor(warped);
-          vec2 frac = fract(warped);
-
-          float minDist = 1.0;
-          for (int dy = -1; dy <= 1; dy++) {
-            for (int dx = -1; dx <= 1; dx++) {
-              vec2 neighbor = vec2(float(dx), float(dy));
-              vec2 cellId = cell + neighbor;
-              float h1 = fract(sin(dot(cellId, vec2(127.1 + uSeed * 0.01, 311.7))) * 43758.5453);
-              float h2 = fract(sin(dot(cellId, vec2(269.5 + uSeed * 0.02, 183.3))) * 43758.5453);
-              vec2 point = neighbor + vec2(h1, h2) - frac;
-              minDist = min(minDist, length(point));
-            }
-          }
-
-          // Thin crack lines at cell boundaries
-          float crackEdge = 1.0 - smoothstep(0.03, 0.12, minDist);
-          // Additional thin vertical/horizontal hairlines
-          float hline = smoothstep(0.96, 1.0, sin(warped.y * 15.0 + uSeed)) * 0.4;
-          float vline = smoothstep(0.96, 1.0, sin(warped.x * 12.0 + uSeed * 1.3)) * 0.3;
-          float cracks = clamp(crackEdge + hline + vline, 0.0, 1.0);
-
-          vec3 crackColor = vec3(0.8, 0.15, 0.05);
-          totalEmissiveRadiance += crackColor * cracks * 0.12;
-        }`,
-      );
-    };
-    mat.needsUpdate = true;
-  }, [seed]);
-
-  return <meshStandardMaterial ref={matRef} color="#5a5e62" roughness={0.95} />;
+// =====================
+// Floor/Ceiling Material - slightly darker concrete
+// =====================
+function FloorCeilMaterial({ seed }: { seed: number }) {
+  const isCeiling = seed > 3;
+  const color = isCeiling ? "#0d0200" : "#1a0400";
+  const emissive = isCeiling ? "#220000" : "#4a0000";
+  const emissiveIntensity = isCeiling ? 0.05 : 0.08;
+  return (
+    <meshStandardMaterial
+      color={color}
+      roughness={0.97}
+      metalness={0.0}
+      emissive={emissive}
+      emissiveIntensity={emissiveIntensity}
+    />
+  );
 }
 
 // =====================
@@ -210,40 +225,36 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
   const gateEmissive = gateUnlocked ? "#00aa44" : "#880000";
 
   const windowPositions: Array<[number, number, number, string]> = [
-    [-12, 2.2, -10, "x"],
-    [-12, 2.2, 5, "x"],
-    [12, 2.2, -10, "x"],
-    [12, 2.2, 5, "x"],
-    [-6, 2.2, -20, "z"],
-    [6, 2.2, -20, "z"],
-    [-6, 2.2, 15, "z"],
-    [6, 2.2, 15, "z"],
+    [-15, 2.2, -10, "x"],
+    [-15, 2.2, 2, "x"],
+    [15, 2.2, -10, "x"],
+    [15, 2.2, 2, "x"],
+    [-6, 2.2, -22, "z"],
+    [6, 2.2, -22, "z"],
+    [-6, 2.2, 18, "z"],
+    [6, 2.2, 18, "z"],
   ];
 
   const gravestonePositions: Array<[number, number, number, number]> = [
-    [-9, 0, -14, 0.3],
-    [9, 0, -14, -0.5],
-    [-9, 0, 10, 0.8],
-    [9, 0, 10, -0.2],
-    [-7, 0, -17, 0.1],
-    [7, 0, -17, -0.6],
+    [-9, 0, 14, 0.3],
+    [9, 0, 14, -0.5],
+    [-11, 0, 16, 0.8],
+    [11, 0, 16, -0.2],
+    [-7, 0, 17, 0.1],
+    [7, 0, 17, -0.6],
   ];
 
   return (
     <group>
       {/* Floor */}
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        position={[0, 0, -2.5]}
-        receiveShadow
-      >
-        <planeGeometry args={[24, 35]} />
-        <meshStandardMaterial color="#585c60" roughness={1} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, -2]} receiveShadow>
+        <planeGeometry args={[30, 40]} />
+        <FloorCeilMaterial seed={1.1} />
       </mesh>
       {/* Ceiling */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, ROOM_HEIGHT, -2.5]}>
-        <planeGeometry args={[24, 35]} />
-        <meshStandardMaterial color="#4a4e52" roughness={1} />
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, ROOM_HEIGHT, -2]}>
+        <planeGeometry args={[30, 40]} />
+        <FloorCeilMaterial seed={5.7} />
       </mesh>
       {/* Walls - darker stone */}
       {WALLS.map((w, index) => (
@@ -255,7 +266,7 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
       {/* Roof ridge beam */}
       <mesh position={[0, ROOM_HEIGHT + 2.5, -2.5]} castShadow>
         <boxGeometry args={[0.4, 0.4, 35.5]} />
-        <meshStandardMaterial color="#545659" roughness={0.95} />
+        <meshStandardMaterial color="#2a0806" roughness={0.95} />
       </mesh>
       {/* Left roof slope */}
       <mesh
@@ -286,12 +297,12 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
       {/* Gable north */}
       <mesh position={[0, ROOM_HEIGHT + 1.25, -20.25]} castShadow>
         <coneGeometry args={[13.5, 2.5, 3]} />
-        <meshStandardMaterial color="#565a5d" roughness={0.95} />
+        <meshStandardMaterial color="#2d0a08" roughness={0.95} />
       </mesh>
       {/* Gable south */}
       <mesh position={[0, ROOM_HEIGHT + 1.25, 15.25]} castShadow>
         <coneGeometry args={[13.5, 2.5, 3]} />
-        <meshStandardMaterial color="#565a5d" roughness={0.95} />
+        <meshStandardMaterial color="#2d0a08" roughness={0.95} />
       </mesh>
       {/* Glowing window frames */}
       {windowPositions.map(([x, y, z, axis]) => {
@@ -375,7 +386,7 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
       {/* Furniture/debris */}
       <mesh position={[-9, 0.5, -10]} castShadow>
         <boxGeometry args={[1.5, 1, 1.5]} />
-        <meshStandardMaterial color="#585c60" roughness={1} />
+        <meshStandardMaterial color="#2f0b09" roughness={1} />
       </mesh>
       <mesh position={[9, 0.75, -12]} castShadow>
         <boxGeometry args={[1.2, 1.5, 0.8]} />
@@ -472,7 +483,7 @@ function Ghost({
     const gp = ghostPos.current;
     const dist = gp.distanceTo(new THREE.Vector3(target.x, 0, target.z));
 
-    const speed = dist > 8 ? 1.5 : dist > 4 ? 2.5 : 2.8;
+    const speed = dist > 8 ? 0.7 : dist > 4 ? 1.2 : 1.5;
     const dir = new THREE.Vector3(
       target.x - gp.x,
       0,
@@ -532,7 +543,7 @@ function Ghost({
     }
 
     if (dist < GHOST_DEATH_RADIUS && catchCooldown.current <= 0) {
-      catchCooldown.current = 2;
+      catchCooldown.current = 5;
       ghostPos.current.set(-10, 0, -15);
       onCatch();
     }
@@ -914,6 +925,56 @@ function WallTorch({ position }: { position: [number, number, number] }) {
   );
 }
 
+// =====================
+// Candle - floor-standing horror candle
+// =====================
+function Candle({ position }: { position: [number, number, number] }) {
+  const lightRef = useRef<THREE.PointLight>(null);
+  const offset = useRef(Math.random() * Math.PI * 2);
+
+  useFrame((state) => {
+    if (lightRef.current) {
+      const t = state.clock.elapsedTime;
+      lightRef.current.intensity =
+        0.8 +
+        Math.sin(t * 8.1 + offset.current) * 0.3 +
+        Math.sin(t * 13.7 + offset.current) * 0.1;
+    }
+  });
+
+  return (
+    <group position={position}>
+      {/* Wax body */}
+      <mesh position={[0, 0.15, 0]}>
+        <cylinderGeometry args={[0.04, 0.05, 0.3, 8]} />
+        <meshStandardMaterial color="#e8dcc8" roughness={0.9} />
+      </mesh>
+      {/* Flame */}
+      <mesh position={[0, 0.34, 0]}>
+        <sphereGeometry args={[0.035, 6, 8]} />
+        <meshStandardMaterial
+          color="#ffdd44"
+          emissive="#ff9900"
+          emissiveIntensity={4}
+          transparent
+          opacity={0.9}
+        />
+      </mesh>
+      {/* Wax drip pool */}
+      <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.06, 8]} />
+        <meshStandardMaterial color="#d4c8a8" roughness={0.95} />
+      </mesh>
+      <pointLight
+        ref={lightRef}
+        color="#ff9922"
+        intensity={0.8}
+        distance={6}
+        castShadow={false}
+      />
+    </group>
+  );
+}
 function HouseLighting() {
   const light1 = useRef<THREE.PointLight>(null);
   const light2 = useRef<THREE.PointLight>(null);
@@ -931,49 +992,59 @@ function HouseLighting() {
 
   return (
     <>
-      {/* Low ambient with blue tint */}
-      <ambientLight intensity={0.15} color="#4466aa" />
-      {/* Dim blue fill from above */}
-      <directionalLight color="#223366" intensity={0.2} position={[0, 10, 0]} />
+      {/* Blood-red ambient - very low */}
+      <ambientLight intensity={0.12} color="#1a0000" />
+      {/* Dim crimson fill from above */}
+      <directionalLight
+        color="#1a0000"
+        intensity={0.05}
+        position={[0, 10, 0]}
+      />
       <pointLight
         ref={light1}
-        color="#ff6020"
+        color="#cc1100"
         intensity={1.0}
         distance={12}
         position={[0, 3, 0]}
       />
       <pointLight
         ref={light2}
-        color="#6020a0"
+        color="#880022"
         intensity={0.7}
         distance={15}
         position={[-8, 3, -8]}
       />
       <pointLight
-        color="#401808"
+        color="#661100"
         intensity={0.5}
         distance={10}
         position={[8, 3, 8]}
       />
       <pointLight
-        color="#301040"
+        color="#550011"
         intensity={0.6}
         distance={12}
         position={[8, 3, -12]}
       />
       <pointLight
-        color="#200808"
+        color="#440000"
         intensity={0.4}
         distance={10}
         position={[-8, 3, 10]}
       />
-      {/* Wall torches */}
+      {/* Wall torches at key spots */}
       <WallTorch position={[-11.5, 2.5, -8]} />
       <WallTorch position={[11.5, 2.5, -8]} />
-      <WallTorch position={[-11.5, 2.5, 6]} />
-      <WallTorch position={[11.5, 2.5, 6]} />
-      <WallTorch position={[0, 2.5, -19.5]} />
-      <WallTorch position={[0, 2.5, 14.5]} />
+      {/* Floor candles throughout rooms */}
+      <Candle position={[-9, 0.15, -5]} />
+      <Candle position={[9, 0.15, -5]} />
+      <Candle position={[-9, 0.15, 3]} />
+      <Candle position={[9, 0.15, 3]} />
+      <Candle position={[0, 0.15, -15]} />
+      <Candle position={[-5, 0.15, -15]} />
+      <Candle position={[5, 0.15, -15]} />
+      <Candle position={[-3, 0.15, 8]} />
+      <Candle position={[3, 0.15, 8]} />
     </>
   );
 }
@@ -1045,8 +1116,8 @@ function PlayerController({
 
   useEffect(() => {
     if (gameState.phase === "playing") {
-      camera.position.set(0, PLAYER_HEIGHT, 10);
-      playerPosRef.current.set(0, PLAYER_HEIGHT, 10);
+      camera.position.set(0, PLAYER_HEIGHT, 14);
+      playerPosRef.current.set(0, PLAYER_HEIGHT, 14);
     }
   }, [gameState.phase, camera, playerPosRef]);
 
@@ -1159,9 +1230,31 @@ function Scene({
 }) {
   return (
     <>
-      <fogExp2 attach="fog" args={["#050810", 0.035]} />
+      <fogExp2 attach="fog" args={["#0a0002", 0.035]} />
       <HouseLighting />
       <HouseGeometry gateUnlocked={gameState.gateUnlocked} />
+      {/* Blood puddles on the floor */}
+      {[
+        { pos: [3, 0.01, -5] as [number, number, number], r: 0.6, id: "b1" },
+        { pos: [-5, 0.01, 2] as [number, number, number], r: 1.2, id: "b2" },
+        { pos: [7, 0.01, -12] as [number, number, number], r: 0.8, id: "b3" },
+        { pos: [-7, 0.01, -12] as [number, number, number], r: 1.2, id: "b4" },
+        { pos: [0, 0.01, 5] as [number, number, number], r: 0.6, id: "b5" },
+        { pos: [-3, 0.01, -8] as [number, number, number], r: 0.9, id: "b6" },
+        { pos: [5, 0.01, -2] as [number, number, number], r: 0.7, id: "b7" },
+        { pos: [-4, 0.01, -16] as [number, number, number], r: 1.0, id: "b8" },
+      ].map(({ pos, r, id }) => (
+        <mesh key={id} position={pos} rotation={[-Math.PI / 2, 0, 0]}>
+          <circleGeometry args={[r, 16]} />
+          <meshStandardMaterial
+            color="#1a0000"
+            emissive="#660000"
+            emissiveIntensity={0.4}
+            roughness={0.2}
+            metalness={0.1}
+          />
+        </mesh>
+      ))}
       {ITEM_POSITIONS.map(({ id, pos }) => (
         <CollectibleItem
           key={id}
@@ -1233,10 +1326,10 @@ function Minimap({
       if (!ctx) return;
 
       ctx.clearRect(0, 0, SIZE, SIZE);
-      ctx.fillStyle = "rgba(5, 2, 8, 0.75)";
+      ctx.fillStyle = "rgba(8, 0, 2, 0.88)";
       ctx.fillRect(0, 0, SIZE, SIZE);
 
-      ctx.strokeStyle = "rgba(180, 140, 100, 0.6)";
+      ctx.strokeStyle = "rgba(160, 20, 20, 0.75)";
       ctx.lineWidth = 1;
       for (const wall of WALLS) {
         const wx = wall.pos[0];
@@ -1250,17 +1343,17 @@ function Minimap({
 
       const [bx1, by1] = worldToCanvas(MAP_X_MIN, MAP_Z_MIN);
       const [bx2, by2] = worldToCanvas(MAP_X_MAX, MAP_Z_MAX);
-      ctx.strokeStyle = "rgba(200, 150, 100, 0.4)";
+      ctx.strokeStyle = "rgba(200, 0, 0, 0.5)";
       ctx.lineWidth = 1;
       ctx.strokeRect(bx1, by1, bx2 - bx1, by2 - by1);
 
       const [gx, gy] = worldToCanvas(GATE_POS[0], GATE_POS[2]);
-      ctx.fillStyle = "#00ff88";
+      ctx.fillStyle = "#ff0000";
       ctx.beginPath();
       ctx.arc(gx, gy, 3, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "#ffd700";
+      ctx.fillStyle = "#ff6600";
       for (const { id, pos } of ITEM_POSITIONS) {
         if (collectedItems.has(id)) continue;
         const [ix, iy] = worldToCanvas(pos[0], pos[2]);
@@ -1272,7 +1365,7 @@ function Minimap({
       const gPos = ghostPosRef.current;
       if (gPos) {
         const [rx, ry] = worldToCanvas(gPos.x, gPos.z);
-        ctx.fillStyle = "#ff4466";
+        ctx.fillStyle = "#ff0088";
         ctx.beginPath();
         ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
         ctx.fill();
@@ -1308,7 +1401,7 @@ function Minimap({
         left: 16,
         width: 120,
         height: 120,
-        border: "1px solid rgba(200,150,100,0.35)",
+        border: "1px solid rgba(150, 0, 0, 0.6)",
         borderRadius: 4,
         zIndex: 10,
         pointerEvents: "none",
@@ -2331,7 +2424,7 @@ export default function App() {
   }, [actor]);
 
   const handleRestart = useCallback(() => {
-    playerPosRef.current.set(0, PLAYER_HEIGHT, 10);
+    playerPosRef.current.set(0, PLAYER_HEIGHT, 14);
     ghostPosRef.current.set(-10, 0, -15);
     touchMoveRef.current = { x: 0, z: 0 };
     touchYawRef.current = 0;
