@@ -133,6 +133,76 @@ const WALLS: WallDef[] = [
 ];
 
 // =====================
+// Wall Material with Procedural Cracks
+// =====================
+function WallMaterial({ seed }: { seed: number }) {
+  const matRef = useRef<THREE.MeshStandardMaterial>(null!);
+
+  useEffect(() => {
+    const mat = matRef.current;
+    if (!mat) return;
+
+    // Vary color slightly based on seed
+    const t = (seed % 7) / 7;
+    const r = 0x1c + Math.floor(t * 4);
+    const g = 0x14 + Math.floor(t * 4);
+    const b = 0x10 + Math.floor(t * 4);
+    mat.color.setRGB(r / 255, g / 255, b / 255);
+    mat.roughness = 0.85 + (seed % 3) * 0.05;
+    mat.emissive.setRGB(0, 0, 0);
+
+    mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uSeed = { value: seed };
+
+      // Inject crack pattern into fragment shader
+      shader.fragmentShader = shader.fragmentShader.replace(
+        "#include <emissivemap_fragment>",
+        `#include <emissivemap_fragment>
+        {
+          // Procedural crack emissive
+          uniform float uSeed;
+          vec2 uv = vUv * 6.0 + uSeed * 0.37;
+
+          // Domain warp
+          float wx = sin(uv.y * 8.3 + uSeed * 1.7) * 0.18;
+          float wy = cos(uv.x * 7.1 + uSeed * 2.3) * 0.18;
+          vec2 warped = uv + vec2(wx, wy);
+
+          // Voronoi-like crack: distance to nearest cell edge
+          vec2 cell = floor(warped);
+          vec2 frac = fract(warped);
+
+          float minDist = 1.0;
+          for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+              vec2 neighbor = vec2(float(dx), float(dy));
+              vec2 cellId = cell + neighbor;
+              float h1 = fract(sin(dot(cellId, vec2(127.1 + uSeed * 0.01, 311.7))) * 43758.5453);
+              float h2 = fract(sin(dot(cellId, vec2(269.5 + uSeed * 0.02, 183.3))) * 43758.5453);
+              vec2 point = neighbor + vec2(h1, h2) - frac;
+              minDist = min(minDist, length(point));
+            }
+          }
+
+          // Thin crack lines at cell boundaries
+          float crackEdge = 1.0 - smoothstep(0.03, 0.12, minDist);
+          // Additional thin vertical/horizontal hairlines
+          float hline = smoothstep(0.96, 1.0, sin(warped.y * 15.0 + uSeed)) * 0.4;
+          float vline = smoothstep(0.96, 1.0, sin(warped.x * 12.0 + uSeed * 1.3)) * 0.3;
+          float cracks = clamp(crackEdge + hline + vline, 0.0, 1.0);
+
+          vec3 crackColor = vec3(0.8, 0.15, 0.05);
+          totalEmissiveRadiance += crackColor * cracks * 0.12;
+        }`,
+      );
+    };
+    mat.needsUpdate = true;
+  }, [seed]);
+
+  return <meshStandardMaterial ref={matRef} color="#1c1410" roughness={0.95} />;
+}
+
+// =====================
 // House Component
 // =====================
 function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
@@ -176,10 +246,10 @@ function HouseGeometry({ gateUnlocked }: { gateUnlocked: boolean }) {
         <meshStandardMaterial color="#0a0806" roughness={1} />
       </mesh>
       {/* Walls - darker stone */}
-      {WALLS.map((w) => (
+      {WALLS.map((w, index) => (
         <mesh key={w.id} position={w.pos} castShadow receiveShadow>
           <boxGeometry args={w.size} />
-          <meshStandardMaterial color="#16100c" roughness={0.95} />
+          <WallMaterial seed={index * 7.3} />
         </mesh>
       ))}
       {/* Roof ridge beam */}
@@ -441,14 +511,12 @@ function Ghost({
       rightFanRef.current.rotation.z = -(0.4 + Math.sin(t * 2 + Math.PI) * 0.6);
     }
 
-    // Trailing fabric flutter
+    // Trailing fabric flutter (solid fabric, no opacity changes)
     const trailMeshes = [trail1Ref, trail2Ref, trail3Ref];
     trailMeshes.forEach((ref, i) => {
       if (ref.current) {
         ref.current.rotation.x = Math.sin(t * 2.5 + i * 0.9) * 0.25;
         ref.current.rotation.z = Math.sin(t * 1.8 + i * 1.2) * 0.12;
-        const mat = ref.current.material as THREE.MeshStandardMaterial;
-        mat.opacity = 0.35 + Math.sin(t * 2 + i) * 0.1;
       }
     });
 
@@ -470,86 +538,192 @@ function Ghost({
     }
   });
 
-  // Fan blade geometry helper (7 blades fanned in an arc)
-  const fanBlades = Array.from({ length: 7 }, (_, i) => i);
+  // Fan blade geometry helper (9 blades fanned in an arc for larger fans)
+  const fanBlades = Array.from({ length: 9 }, (_, i) => i);
 
   return (
     <group ref={ghostRef} position={[-10, PLAYER_HEIGHT / 2, -15]}>
       <group ref={queenGroupRef}>
-        {/* === BODY / TORSO === */}
-        <mesh ref={bodyRef} position={[0, 0.3, 0]}>
-          <boxGeometry args={[0.28, 0.7, 0.18]} />
+        {/* === LEGS === */}
+        {/* Left leg */}
+        <mesh position={[-0.09, -0.55, 0]}>
+          <cylinderGeometry args={[0.045, 0.04, 0.5, 8]} />
+          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
+        </mesh>
+        {/* Left boot */}
+        <mesh position={[-0.09, -0.82, 0]}>
+          <cylinderGeometry args={[0.05, 0.055, 0.18, 8]} />
           <meshStandardMaterial
-            color="#1a0008"
-            emissive="#cc1122"
-            emissiveIntensity={0.5}
+            color="#1a0a0a"
             roughness={0.6}
-            transparent
-            opacity={0.92}
+            metalness={0.3}
+          />
+        </mesh>
+        {/* Right leg */}
+        <mesh position={[0.09, -0.55, 0]}>
+          <cylinderGeometry args={[0.045, 0.04, 0.5, 8]} />
+          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
+        </mesh>
+        {/* Right boot */}
+        <mesh position={[0.09, -0.82, 0]}>
+          <cylinderGeometry args={[0.05, 0.055, 0.18, 8]} />
+          <meshStandardMaterial
+            color="#1a0a0a"
+            roughness={0.6}
+            metalness={0.3}
           />
         </mesh>
 
-        {/* === ROBE / SKIRT (flaring cone) === */}
-        <mesh ref={robeRef} position={[0, -0.3, 0]} rotation={[Math.PI, 0, 0]}>
-          <coneGeometry args={[0.65, 1.1, 12, 1, true]} />
+        {/* === ROBE / SKIRT (solid deep red) === */}
+        <mesh ref={robeRef} position={[0, -0.28, 0]} rotation={[Math.PI, 0, 0]}>
+          <coneGeometry args={[0.68, 1.0, 14, 1, false]} />
           <meshStandardMaterial
-            color="#330008"
-            emissive="#cc1122"
-            emissiveIntensity={0.2}
-            transparent
-            opacity={0.78}
+            color="#8b0000"
+            emissive="#cc2200"
+            emissiveIntensity={0.15}
+            roughness={0.7}
             side={THREE.DoubleSide}
-            depthWrite={false}
-            roughness={0.8}
           />
         </mesh>
 
-        {/* === HEAD === */}
-        <mesh position={[0, 0.82, 0]}>
-          <sphereGeometry args={[0.18, 12, 12]} />
+        {/* === TORSO / CORSET === */}
+        <mesh ref={bodyRef} position={[0, 0.28, 0]}>
+          <boxGeometry args={[0.3, 0.55, 0.18]} />
           <meshStandardMaterial
-            color="#2a0010"
-            emissive="#cc1122"
-            emissiveIntensity={0.4}
+            color="#8b0000"
+            emissive="#cc2200"
+            emissiveIntensity={0.1}
             roughness={0.5}
+            metalness={0.2}
           />
+        </mesh>
+        {/* Corset belt detail */}
+        <mesh position={[0, 0.04, 0.1]}>
+          <boxGeometry args={[0.31, 0.06, 0.02]} />
+          <meshStandardMaterial
+            color="#2a0000"
+            roughness={0.4}
+            metalness={0.5}
+          />
+        </mesh>
+
+        {/* === SHOULDERS === */}
+        <mesh position={[-0.2, 0.48, 0]}>
+          <sphereGeometry args={[0.075, 8, 8]} />
+          <meshStandardMaterial
+            color="#8b0000"
+            roughness={0.5}
+            metalness={0.2}
+          />
+        </mesh>
+        <mesh position={[0.2, 0.48, 0]}>
+          <sphereGeometry args={[0.075, 8, 8]} />
+          <meshStandardMaterial
+            color="#8b0000"
+            roughness={0.5}
+            metalness={0.2}
+          />
+        </mesh>
+
+        {/* === ARMS === */}
+        {/* Left upper arm */}
+        <mesh position={[-0.22, 0.3, 0]} rotation={[0, 0, 0.3]}>
+          <cylinderGeometry args={[0.04, 0.035, 0.32, 8]} />
+          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
+        </mesh>
+        {/* Left forearm */}
+        <mesh position={[-0.32, 0.12, 0]} rotation={[0, 0, 0.5]}>
+          <cylinderGeometry args={[0.032, 0.028, 0.28, 8]} />
+          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
+        </mesh>
+        {/* Right upper arm */}
+        <mesh position={[0.22, 0.3, 0]} rotation={[0, 0, -0.3]}>
+          <cylinderGeometry args={[0.04, 0.035, 0.32, 8]} />
+          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
+        </mesh>
+        {/* Right forearm */}
+        <mesh position={[0.32, 0.12, 0]} rotation={[0, 0, -0.5]}>
+          <cylinderGeometry args={[0.032, 0.028, 0.28, 8]} />
+          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
+        </mesh>
+
+        {/* === NECK === */}
+        <mesh position={[0, 0.62, 0]}>
+          <cylinderGeometry args={[0.055, 0.065, 0.14, 8]} />
+          <meshStandardMaterial color="#f2c9a0" roughness={0.7} />
+        </mesh>
+
+        {/* === HEAD (skin tone) === */}
+        <mesh position={[0, 0.82, 0]}>
+          <sphereGeometry args={[0.2, 14, 14]} />
+          <meshStandardMaterial color="#f2c9a0" roughness={0.6} />
+        </mesh>
+
+        {/* === HAIR (long black, flowing back) === */}
+        {/* Main hair mass on top/back */}
+        <mesh position={[0, 0.88, -0.1]} rotation={[0.3, 0, 0]}>
+          <cylinderGeometry args={[0.19, 0.12, 0.4, 10]} />
+          <meshStandardMaterial color="#0d0005" roughness={0.9} />
+        </mesh>
+        {/* Hair flowing down the back */}
+        <mesh position={[0, 0.55, -0.22]} rotation={[0.5, 0, 0]}>
+          <boxGeometry args={[0.32, 0.55, 0.06]} />
+          <meshStandardMaterial
+            color="#0d0005"
+            roughness={0.9}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+        <mesh position={[0, 0.2, -0.28]} rotation={[0.4, 0, 0]}>
+          <boxGeometry args={[0.28, 0.5, 0.05]} />
+          <meshStandardMaterial
+            color="#0d0005"
+            roughness={0.9}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+        {/* Side hair strands */}
+        <mesh position={[-0.17, 0.72, -0.05]} rotation={[0.2, 0, -0.2]}>
+          <boxGeometry args={[0.06, 0.3, 0.04]} />
+          <meshStandardMaterial color="#0d0005" roughness={0.9} />
+        </mesh>
+        <mesh position={[0.17, 0.72, -0.05]} rotation={[0.2, 0, 0.2]}>
+          <boxGeometry args={[0.06, 0.3, 0.04]} />
+          <meshStandardMaterial color="#0d0005" roughness={0.9} />
         </mesh>
 
         {/* === GLOWING RED EYES === */}
-        <mesh position={[-0.07, 0.86, 0.16]}>
-          <sphereGeometry args={[0.035, 8, 8]} />
+        <mesh position={[-0.07, 0.86, 0.18]}>
+          <sphereGeometry args={[0.032, 8, 8]} />
           <meshStandardMaterial
             emissive="#ff2200"
-            emissiveIntensity={4}
+            emissiveIntensity={5}
             color="#ff0000"
           />
         </mesh>
-        <mesh position={[0.07, 0.86, 0.16]}>
-          <sphereGeometry args={[0.035, 8, 8]} />
+        <mesh position={[0.07, 0.86, 0.18]}>
+          <sphereGeometry args={[0.032, 8, 8]} />
           <meshStandardMaterial
             emissive="#ff2200"
-            emissiveIntensity={4}
+            emissiveIntensity={5}
             color="#ff0000"
           />
         </mesh>
 
-        {/* === SPIKE CROWN (5 spikes in semicircle) === */}
-        {[0, 1, 2, 3, 4].map((i) => {
-          const angle = (i / 4) * Math.PI - Math.PI / 2;
-          const r = 0.14;
+        {/* === SPIKE CROWN (7 dark-iron spikes in semicircle) === */}
+        {[0, 1, 2, 3, 4, 5, 6].map((i) => {
+          const angle = (i / 6) * Math.PI - Math.PI / 2;
+          const r = 0.16;
+          const isMid = i === 3;
           return (
             <mesh
               key={`crown-${i}`}
               position={[
                 Math.cos(angle) * r,
-                1.04 + (i === 2 ? 0.08 : 0),
-                Math.sin(angle) * r * 0.4,
+                1.06 + (isMid ? 0.1 : 0),
+                Math.sin(angle) * r * 0.35,
               ]}
-              rotation={[
-                i === 2 ? -0.1 : i < 2 ? -0.15 : 0.15,
-                0,
-                (i - 2) * 0.18,
-              ]}
+              rotation={[isMid ? -0.1 : i < 3 ? -0.18 : 0.18, 0, (i - 3) * 0.2]}
               ref={(el) => {
                 if (el) {
                   const mat = el.material as THREE.MeshStandardMaterial;
@@ -558,129 +732,137 @@ function Ghost({
                 }
               }}
             >
-              <coneGeometry args={[0.025, 0.2 + (i === 2 ? 0.07 : 0), 6]} />
+              <coneGeometry args={[0.022, 0.25 + (isMid ? 0.08 : 0), 6]} />
               <meshStandardMaterial
-                color="#666666"
-                emissive="#cc1122"
+                color="#2a2a2a"
+                emissive="#880000"
                 emissiveIntensity={0.1}
-                metalness={0.8}
-                roughness={0.2}
+                metalness={0.85}
+                roughness={0.15}
               />
             </mesh>
           );
         })}
+        {/* Crown band base */}
+        <mesh position={[0, 1.0, 0]}>
+          <torusGeometry args={[0.17, 0.022, 8, 20, Math.PI]} />
+          <meshStandardMaterial
+            color="#2a2a2a"
+            metalness={0.85}
+            roughness={0.15}
+          />
+        </mesh>
 
-        {/* === LEFT FAN ARM === */}
+        {/* === LEFT FAN (large, bright red, with handle) === */}
         <group
           ref={leftFanRef}
-          position={[-0.28, 0.35, 0]}
+          position={[-0.44, 0.18, 0]}
           rotation={[0, 0, 0.4]}
         >
+          {/* Fan handle */}
+          <mesh position={[0, -0.12, 0]}>
+            <cylinderGeometry args={[0.012, 0.01, 0.24, 6]} />
+            <meshStandardMaterial
+              color="#1a0000"
+              roughness={0.5}
+              metalness={0.3}
+            />
+          </mesh>
           {fanBlades.map((i) => (
             <mesh
               key={`lfan-${i}`}
               position={[
-                Math.cos((i - 3) * (Math.PI / 8)) * 0.22,
-                Math.sin((i - 3) * (Math.PI / 8)) * 0.22,
+                Math.cos((i - 4) * (Math.PI / 10)) * 0.3,
+                Math.sin((i - 4) * (Math.PI / 10)) * 0.3,
                 0,
               ]}
-              rotation={[0, 0, (i - 3) * (Math.PI / 8)]}
+              rotation={[0, 0, (i - 4) * (Math.PI / 10)]}
             >
-              <boxGeometry args={[0.04, 0.44, 0.008]} />
+              <boxGeometry args={[0.045, 0.58, 0.007]} />
               <meshStandardMaterial
-                color="#660010"
-                emissive="#cc1122"
-                emissiveIntensity={0.5}
-                transparent
-                opacity={0.85}
+                color="#cc2200"
+                emissive="#ff1100"
+                emissiveIntensity={0.4}
                 side={THREE.DoubleSide}
-                depthWrite={false}
+                roughness={0.4}
               />
             </mesh>
           ))}
         </group>
 
-        {/* === RIGHT FAN ARM === */}
+        {/* === RIGHT FAN (large, bright red, with handle) === */}
         <group
           ref={rightFanRef}
-          position={[0.28, 0.35, 0]}
+          position={[0.44, 0.18, 0]}
           rotation={[0, 0, -0.4]}
         >
+          {/* Fan handle */}
+          <mesh position={[0, -0.12, 0]}>
+            <cylinderGeometry args={[0.012, 0.01, 0.24, 6]} />
+            <meshStandardMaterial
+              color="#1a0000"
+              roughness={0.5}
+              metalness={0.3}
+            />
+          </mesh>
           {fanBlades.map((i) => (
             <mesh
               key={`rfan-${i}`}
               position={[
-                Math.cos((i - 3) * (Math.PI / 8)) * 0.22,
-                Math.sin((i - 3) * (Math.PI / 8)) * 0.22,
+                Math.cos((i - 4) * (Math.PI / 10)) * 0.3,
+                Math.sin((i - 4) * (Math.PI / 10)) * 0.3,
                 0,
               ]}
-              rotation={[0, 0, (i - 3) * (Math.PI / 8)]}
+              rotation={[0, 0, (i - 4) * (Math.PI / 10)]}
             >
-              <boxGeometry args={[0.04, 0.44, 0.008]} />
+              <boxGeometry args={[0.045, 0.58, 0.007]} />
               <meshStandardMaterial
-                color="#660010"
-                emissive="#cc1122"
-                emissiveIntensity={0.5}
-                transparent
-                opacity={0.85}
+                color="#cc2200"
+                emissive="#ff1100"
+                emissiveIntensity={0.4}
                 side={THREE.DoubleSide}
-                depthWrite={false}
+                roughness={0.4}
               />
             </mesh>
           ))}
         </group>
 
-        {/* === TRAILING ROBE FABRIC === */}
-        <mesh ref={trail1Ref} position={[0, -0.6, 0.15]}>
-          <boxGeometry args={[0.5, 0.8, 0.01]} />
+        {/* === TRAILING ROBE FABRIC (solid, no transparency) === */}
+        <mesh ref={trail1Ref} position={[0, -0.62, 0.12]}>
+          <boxGeometry args={[0.5, 0.72, 0.01]} />
           <meshStandardMaterial
-            color="#440010"
-            emissive="#cc1122"
-            emissiveIntensity={0.3}
-            transparent
-            opacity={0.4}
+            color="#8b0000"
+            emissive="#cc2200"
+            emissiveIntensity={0.1}
             side={THREE.DoubleSide}
-            depthWrite={false}
           />
         </mesh>
-        <mesh ref={trail2Ref} position={[0.18, -0.55, 0.2]}>
-          <boxGeometry args={[0.25, 0.7, 0.01]} />
+        <mesh ref={trail2Ref} position={[0.2, -0.58, 0.18]}>
+          <boxGeometry args={[0.22, 0.62, 0.01]} />
           <meshStandardMaterial
-            color="#330008"
-            emissive="#cc1122"
-            emissiveIntensity={0.25}
-            transparent
-            opacity={0.35}
+            color="#6b0000"
+            emissive="#cc2200"
+            emissiveIntensity={0.08}
             side={THREE.DoubleSide}
-            depthWrite={false}
           />
         </mesh>
-        <mesh ref={trail3Ref} position={[-0.18, -0.5, 0.22]}>
-          <boxGeometry args={[0.25, 0.65, 0.01]} />
+        <mesh ref={trail3Ref} position={[-0.2, -0.54, 0.2]}>
+          <boxGeometry args={[0.22, 0.6, 0.01]} />
           <meshStandardMaterial
-            color="#330008"
-            emissive="#cc1122"
-            emissiveIntensity={0.25}
-            transparent
-            opacity={0.3}
+            color="#6b0000"
+            emissive="#cc2200"
+            emissiveIntensity={0.08}
             side={THREE.DoubleSide}
-            depthWrite={false}
           />
         </mesh>
 
-        {/* === RED AURA GLOW === */}
+        {/* === SUBTLE RED ATMOSPHERE LIGHT (not a ghost aura, just dramatic lighting) === */}
         <pointLight
           ref={redLightRef}
           color="#cc1122"
-          intensity={2.5}
-          distance={7}
+          intensity={1.8}
+          distance={6}
           position={[0, 0.3, 0]}
-        />
-        <pointLight
-          color="#ff4400"
-          intensity={1.0}
-          distance={3}
-          position={[0, 0.9, 0.3]}
         />
       </group>
     </group>
