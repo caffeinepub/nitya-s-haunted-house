@@ -2,7 +2,6 @@ import { PointerLockControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { useActor } from "./hooks/useActor";
 
 // =====================
 // Types
@@ -184,16 +183,16 @@ const WALLS: WallDef[] = [
 // Wall Material - concrete color with emissive cracks
 // =====================
 function WallMaterial({ seed }: { seed: number }) {
-  // Blood-stained dark stone, varied per wall
-  const baseShades = ["#2d0a08", "#3a0e0c", "#2a0806", "#320c0a", "#2f0b09"];
+  // Blood-stained dark stone, varied per wall - lightened for visibility
+  const baseShades = ["#5a1a14", "#6b2018", "#4d1610", "#622018", "#571c14"];
   const hex = baseShades[Math.abs(Math.round(seed)) % baseShades.length];
   return (
     <meshStandardMaterial
       color={hex}
       roughness={0.95}
       metalness={0.0}
-      emissive="#6b0000"
-      emissiveIntensity={0.12 + (seed % 4) * 0.03}
+      emissive="#8b1010"
+      emissiveIntensity={0.4 + (seed % 4) * 0.025}
     />
   );
 }
@@ -203,9 +202,9 @@ function WallMaterial({ seed }: { seed: number }) {
 // =====================
 function FloorCeilMaterial({ seed }: { seed: number }) {
   const isCeiling = seed > 3;
-  const color = isCeiling ? "#0d0200" : "#1a0400";
-  const emissive = isCeiling ? "#220000" : "#4a0000";
-  const emissiveIntensity = isCeiling ? 0.05 : 0.08;
+  const color = isCeiling ? "#1e0504" : "#3a0c04";
+  const emissive = isCeiling ? "#550000" : "#880000";
+  const emissiveIntensity = isCeiling ? 0.2 : 0.25;
   return (
     <meshStandardMaterial
       color={color}
@@ -463,13 +462,12 @@ function Ghost({
   // Queen-specific refs
   const queenGroupRef = useRef<THREE.Group>(null);
   const robeRef = useRef<THREE.Mesh>(null);
-  const leftFanRef = useRef<THREE.Group>(null);
-  const rightFanRef = useRef<THREE.Group>(null);
-  const trail1Ref = useRef<THREE.Mesh>(null);
-  const trail2Ref = useRef<THREE.Mesh>(null);
-  const trail3Ref = useRef<THREE.Mesh>(null);
+  // Fan and trail refs removed (nurse redesign)
+  // const _leftFanRef unused
+  // const _rightFanRef unused
+  // const _trail1Ref unused
   const redLightRef = useRef<THREE.PointLight>(null);
-  const crownMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
+  const _crownMatsRef = useRef<THREE.MeshStandardMaterial[]>([]);
   const leftLegRef = useRef<THREE.Group>(null);
   const rightLegRef = useRef<THREE.Group>(null);
   const leftArmRef = useRef<THREE.Group>(null);
@@ -510,7 +508,7 @@ function Ghost({
     ghostRef.current.quaternion.copy(ghostCurrentQuat.current);
 
     const t = state.clock.elapsedTime;
-    const emissive = 0.6 + Math.sin(t * 4) * 0.3;
+    const _emissive = 0.6 + Math.sin(t * 4) * 0.3;
 
     // Keep queen group grounded
     if (queenGroupRef.current) {
@@ -534,36 +532,15 @@ function Ghost({
       rightArmRef.current.rotation.x = Math.sin(t * runFreq) * armAmp;
     }
 
-    // Robe billowing
+    // Dress billowing
     if (robeRef.current) {
-      robeRef.current.scale.x = 1 + Math.sin(t * 3) * 0.15;
+      robeRef.current.scale.x = 1 + Math.sin(t * 3) * 0.1;
       const mat = robeRef.current.material as THREE.MeshStandardMaterial;
-      mat.emissiveIntensity = emissive * 0.4;
+      mat.emissiveIntensity = 0.05 + Math.sin(t * 3) * 0.02;
     }
 
-    // Left fan spread/close (opens dramatically)
-    if (leftFanRef.current) {
-      leftFanRef.current.rotation.z = 0.4 + Math.sin(t * 2) * 0.6;
-    }
-    // Right fan opposite phase
-    if (rightFanRef.current) {
-      rightFanRef.current.rotation.z = -(0.4 + Math.sin(t * 2 + Math.PI) * 0.6);
-    }
-
-    // Trailing fabric flutter (solid fabric, no opacity changes)
-    const trailMeshes = [trail1Ref, trail2Ref, trail3Ref];
-    trailMeshes.forEach((ref, i) => {
-      if (ref.current) {
-        ref.current.rotation.x = Math.sin(t * 2.5 + i * 0.9) * 0.25;
-        ref.current.rotation.z = Math.sin(t * 1.8 + i * 1.2) * 0.12;
-      }
-    });
-
-    // Crown spike emissive pulse when close
-    for (const mat of crownMatsRef.current) {
-      if (mat)
-        mat.emissiveIntensity = dist < 6 ? 0.5 + Math.sin(t * 6) * 0.4 : 0.1;
-    }
+    // Red cross pulse when close
+    // (crownMatsRef kept empty - crown removed)
 
     // Pulsing red light
     if (redLightRef.current) {
@@ -577,9 +554,6 @@ function Ghost({
     }
   });
 
-  // Fan blade geometry helper (9 blades fanned in an arc for larger fans)
-  const fanBlades = Array.from({ length: 9 }, (_, i) => i);
-
   return (
     <group ref={ghostRef} position={[-10, 0, -15]}>
       <group ref={queenGroupRef} position={[0, 1.0, 0]} scale={[1.1, 1.1, 1.1]}>
@@ -591,13 +565,13 @@ function Ghost({
             <cylinderGeometry args={[0.045, 0.04, 0.5, 14]} />
             <meshStandardMaterial color="#e8b89a" roughness={0.7} />
           </mesh>
-          {/* Left boot */}
+          {/* Left boot (dark flat) */}
           <mesh position={[0, -0.52, 0]}>
             <cylinderGeometry args={[0.05, 0.055, 0.18, 8]} />
             <meshStandardMaterial
-              color="#1a0a0a"
-              roughness={0.6}
-              metalness={0.3}
+              color="#1a0000"
+              roughness={0.4}
+              metalness={0.0}
             />
           </mesh>
         </group>
@@ -608,13 +582,13 @@ function Ghost({
             <cylinderGeometry args={[0.045, 0.04, 0.5, 14]} />
             <meshStandardMaterial color="#e8b89a" roughness={0.7} />
           </mesh>
-          {/* Right boot */}
+          {/* Right boot (dark flat) */}
           <mesh position={[0, -0.52, 0]}>
             <cylinderGeometry args={[0.05, 0.055, 0.18, 8]} />
             <meshStandardMaterial
-              color="#1a0a0a"
-              roughness={0.6}
-              metalness={0.3}
+              color="#1a0000"
+              roughness={0.4}
+              metalness={0.0}
             />
           </mesh>
         </group>
@@ -624,10 +598,10 @@ function Ghost({
         <mesh ref={robeRef} position={[0, -0.35, 0.18]}>
           <cylinderGeometry args={[0.35, 0.55, 0.85, 20, 1, true, -0.6, 1.2]} />
           <meshStandardMaterial
-            color="#6b0000"
-            emissive="#cc2200"
+            color="#8b0000"
+            emissive="#cc0022"
             emissiveIntensity={0.12}
-            roughness={0.75}
+            roughness={0.6}
             side={THREE.DoubleSide}
           />
         </mesh>
@@ -637,10 +611,10 @@ function Ghost({
             args={[0.35, 0.55, 0.85, 20, 1, true, Math.PI - 0.6, 1.2]}
           />
           <meshStandardMaterial
-            color="#5a0000"
-            emissive="#cc2200"
-            emissiveIntensity={0.1}
-            roughness={0.8}
+            color="#a00020"
+            emissive="#cc0022"
+            emissiveIntensity={0.12}
+            roughness={0.6}
             side={THREE.DoubleSide}
           />
         </mesh>
@@ -650,10 +624,10 @@ function Ghost({
             args={[0.35, 0.55, 0.85, 20, 1, true, -Math.PI / 2 - 0.6, 1.2]}
           />
           <meshStandardMaterial
-            color="#630000"
-            emissive="#cc2200"
-            emissiveIntensity={0.11}
-            roughness={0.78}
+            color="#cc2244"
+            emissive="#cc0022"
+            emissiveIntensity={0.12}
+            roughness={0.6}
             side={THREE.DoubleSide}
           />
         </mesh>
@@ -663,50 +637,65 @@ function Ghost({
             args={[0.35, 0.55, 0.85, 20, 1, true, Math.PI / 2 - 0.6, 1.2]}
           />
           <meshStandardMaterial
-            color="#630000"
-            emissive="#cc2200"
+            color="#080010"
+            emissive="#880022"
             emissiveIntensity={0.11}
             roughness={0.78}
             side={THREE.DoubleSide}
           />
         </mesh>
 
-        {/* === TORSO / CORSET === */}
-        <mesh ref={bodyRef} position={[0, 0.28, 0]}>
-          <cylinderGeometry args={[0.14, 0.17, 0.55, 16]} />
-          <meshStandardMaterial
-            color="#8b0000"
-            emissive="#cc2200"
-            emissiveIntensity={0.1}
-            roughness={0.45}
-            metalness={0.35}
+        {/* === CAPE (dark flowing behind body) === */}
+        <mesh position={[0, -0.05, -0.28]}>
+          <cylinderGeometry
+            args={[0.3, 0.45, 1.0, 16, 1, true, Math.PI * 0.25, Math.PI * 1.5]}
           />
-        </mesh>
-        {/* Corset belt detail */}
-        <mesh position={[0, 0.04, 0.1]}>
-          <boxGeometry args={[0.31, 0.06, 0.02]} />
           <meshStandardMaterial
-            color="#2a0000"
-            roughness={0.4}
-            metalness={0.5}
+            color="#6b0015"
+            emissive="#aa0020"
+            emissiveIntensity={0.1}
+            roughness={0.6}
+            side={THREE.DoubleSide}
           />
         </mesh>
 
-        {/* === SHOULDERS === */}
+        {/* === TORSO / NIGHTY BODICE === */}
+        <mesh ref={bodyRef} position={[0, 0.28, 0]}>
+          <cylinderGeometry args={[0.14, 0.17, 0.55, 16]} />
+          <meshStandardMaterial
+            color="#cc1133"
+            emissive="#cc0022"
+            emissiveIntensity={0.1}
+            roughness={0.3}
+            metalness={0.0}
+          />
+        </mesh>
+        {/* Left nighty strap */}
+        <mesh position={[-0.1, 0.48, 0.12]}>
+          <boxGeometry args={[0.025, 0.18, 0.02]} />
+          <meshStandardMaterial color="#cc1133" roughness={0.3} />
+        </mesh>
+        {/* Right nighty strap */}
+        <mesh position={[0.1, 0.48, 0.12]}>
+          <boxGeometry args={[0.025, 0.18, 0.02]} />
+          <meshStandardMaterial color="#cc1133" roughness={0.3} />
+        </mesh>
+
+        {/* === SHOULDERS (nighty) === */}
         <mesh position={[-0.2, 0.48, 0]}>
           <sphereGeometry args={[0.085, 16, 16]} />
           <meshStandardMaterial
-            color="#8b0000"
-            roughness={0.5}
-            metalness={0.2}
+            color="#cc1133"
+            roughness={0.35}
+            metalness={0.0}
           />
         </mesh>
         <mesh position={[0.2, 0.48, 0]}>
           <sphereGeometry args={[0.085, 16, 16]} />
           <meshStandardMaterial
-            color="#8b0000"
-            roughness={0.5}
-            metalness={0.2}
+            color="#cc1133"
+            roughness={0.35}
+            metalness={0.0}
           />
         </mesh>
 
@@ -754,13 +743,13 @@ function Ghost({
         {/* Main hair mass on top/back */}
         <mesh position={[0, 0.88, -0.1]} rotation={[0.3, 0, 0]}>
           <cylinderGeometry args={[0.19, 0.12, 0.4, 16]} />
-          <meshStandardMaterial color="#0d0005" roughness={0.9} />
+          <meshStandardMaterial color="#3d1a08" roughness={0.9} />
         </mesh>
         {/* Hair flowing down the back */}
         <mesh position={[0, 0.55, -0.22]} rotation={[0.5, 0, 0]}>
           <boxGeometry args={[0.32, 0.55, 0.06]} />
           <meshStandardMaterial
-            color="#0d0005"
+            color="#3d1a08"
             roughness={0.9}
             side={THREE.DoubleSide}
           />
@@ -768,7 +757,7 @@ function Ghost({
         <mesh position={[0, 0.2, -0.28]} rotation={[0.4, 0, 0]}>
           <boxGeometry args={[0.28, 0.5, 0.05]} />
           <meshStandardMaterial
-            color="#0d0005"
+            color="#3d1a08"
             roughness={0.9}
             side={THREE.DoubleSide}
           />
@@ -776,174 +765,28 @@ function Ghost({
         {/* Side hair strands */}
         <mesh position={[-0.17, 0.72, -0.05]} rotation={[0.2, 0, -0.2]}>
           <boxGeometry args={[0.06, 0.3, 0.04]} />
-          <meshStandardMaterial color="#0d0005" roughness={0.9} />
+          <meshStandardMaterial color="#3d1a08" roughness={0.9} />
         </mesh>
         <mesh position={[0.17, 0.72, -0.05]} rotation={[0.2, 0, 0.2]}>
           <boxGeometry args={[0.06, 0.3, 0.04]} />
-          <meshStandardMaterial color="#0d0005" roughness={0.9} />
+          <meshStandardMaterial color="#3d1a08" roughness={0.9} />
         </mesh>
 
-        {/* === GLOWING RED EYES === */}
+        {/* === KOHL-LINED DARK EYES === */}
         <mesh position={[-0.07, 0.86, 0.18]}>
           <sphereGeometry args={[0.032, 8, 8]} />
           <meshStandardMaterial
-            emissive="#ff2200"
-            emissiveIntensity={5}
-            color="#ff0000"
+            emissive="#1a0000"
+            emissiveIntensity={1.5}
+            color="#3d0000"
           />
         </mesh>
         <mesh position={[0.07, 0.86, 0.18]}>
           <sphereGeometry args={[0.032, 8, 8]} />
           <meshStandardMaterial
-            emissive="#ff2200"
-            emissiveIntensity={5}
-            color="#ff0000"
-          />
-        </mesh>
-
-        {/* === SPIKE CROWN (7 dark-iron spikes in semicircle) === */}
-        {[0, 1, 2, 3, 4, 5, 6].map((i) => {
-          const angle = (i / 6) * Math.PI - Math.PI / 2;
-          const r = 0.16;
-          const isMid = i === 3;
-          return (
-            <mesh
-              key={`crown-${i}`}
-              position={[
-                Math.cos(angle) * r,
-                1.06 + (isMid ? 0.1 : 0),
-                Math.sin(angle) * r * 0.35,
-              ]}
-              rotation={[isMid ? -0.1 : i < 3 ? -0.18 : 0.18, 0, (i - 3) * 0.2]}
-              ref={(el) => {
-                if (el) {
-                  const mat = el.material as THREE.MeshStandardMaterial;
-                  if (!crownMatsRef.current.includes(mat))
-                    crownMatsRef.current.push(mat);
-                }
-              }}
-            >
-              <coneGeometry args={[0.022, 0.25 + (isMid ? 0.08 : 0), 6]} />
-              <meshStandardMaterial
-                color="#2a2a2a"
-                emissive="#880000"
-                emissiveIntensity={0.1}
-                metalness={0.85}
-                roughness={0.15}
-              />
-            </mesh>
-          );
-        })}
-        {/* Crown band base */}
-        <mesh position={[0, 1.0, 0]}>
-          <torusGeometry args={[0.17, 0.022, 8, 20, Math.PI]} />
-          <meshStandardMaterial
-            color="#2a2a2a"
-            metalness={0.85}
-            roughness={0.15}
-          />
-        </mesh>
-
-        {/* === LEFT FAN (large, bright red, with handle) === */}
-        <group
-          ref={leftFanRef}
-          position={[-0.44, 0.18, 0]}
-          rotation={[0, 0, 0.4]}
-        >
-          {/* Fan handle */}
-          <mesh position={[0, -0.12, 0]}>
-            <cylinderGeometry args={[0.012, 0.01, 0.24, 6]} />
-            <meshStandardMaterial
-              color="#1a0000"
-              roughness={0.5}
-              metalness={0.3}
-            />
-          </mesh>
-          {fanBlades.map((i) => (
-            <mesh
-              key={`lfan-${i}`}
-              position={[
-                Math.cos((i - 4) * (Math.PI / 10)) * 0.3,
-                Math.sin((i - 4) * (Math.PI / 10)) * 0.3,
-                0,
-              ]}
-              rotation={[0, 0, (i - 4) * (Math.PI / 10)]}
-            >
-              <boxGeometry args={[0.045, 0.58, 0.007]} />
-              <meshStandardMaterial
-                color="#cc2200"
-                emissive="#ff1100"
-                emissiveIntensity={0.4}
-                side={THREE.DoubleSide}
-                roughness={0.4}
-              />
-            </mesh>
-          ))}
-        </group>
-
-        {/* === RIGHT FAN (large, bright red, with handle) === */}
-        <group
-          ref={rightFanRef}
-          position={[0.44, 0.18, 0]}
-          rotation={[0, 0, -0.4]}
-        >
-          {/* Fan handle */}
-          <mesh position={[0, -0.12, 0]}>
-            <cylinderGeometry args={[0.012, 0.01, 0.24, 6]} />
-            <meshStandardMaterial
-              color="#1a0000"
-              roughness={0.5}
-              metalness={0.3}
-            />
-          </mesh>
-          {fanBlades.map((i) => (
-            <mesh
-              key={`rfan-${i}`}
-              position={[
-                Math.cos((i - 4) * (Math.PI / 10)) * 0.3,
-                Math.sin((i - 4) * (Math.PI / 10)) * 0.3,
-                0,
-              ]}
-              rotation={[0, 0, (i - 4) * (Math.PI / 10)]}
-            >
-              <boxGeometry args={[0.045, 0.58, 0.007]} />
-              <meshStandardMaterial
-                color="#cc2200"
-                emissive="#ff1100"
-                emissiveIntensity={0.4}
-                side={THREE.DoubleSide}
-                roughness={0.4}
-              />
-            </mesh>
-          ))}
-        </group>
-
-        {/* === TRAILING ROBE FABRIC (solid, no transparency) === */}
-        <mesh ref={trail1Ref} position={[0, -0.62, 0.12]}>
-          <boxGeometry args={[0.5, 0.72, 0.01]} />
-          <meshStandardMaterial
-            color="#8b0000"
-            emissive="#cc2200"
-            emissiveIntensity={0.1}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-        <mesh ref={trail2Ref} position={[0.2, -0.58, 0.18]}>
-          <boxGeometry args={[0.22, 0.62, 0.01]} />
-          <meshStandardMaterial
-            color="#6b0000"
-            emissive="#cc2200"
-            emissiveIntensity={0.08}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-        <mesh ref={trail3Ref} position={[-0.2, -0.54, 0.2]}>
-          <boxGeometry args={[0.22, 0.6, 0.01]} />
-          <meshStandardMaterial
-            color="#6b0000"
-            emissive="#cc2200"
-            emissiveIntensity={0.08}
-            side={THREE.DoubleSide}
+            emissive="#1a0000"
+            emissiveIntensity={1.5}
+            color="#3d0000"
           />
         </mesh>
 
@@ -970,7 +813,7 @@ function WallTorch({ position }: { position: [number, number, number] }) {
     if (lightRef.current) {
       const t = state.clock.elapsedTime;
       lightRef.current.intensity =
-        1.4 +
+        2.8 +
         Math.sin(t * 7.3 + offset.current) * 0.4 +
         Math.sin(t * 11 + offset.current) * 0.15;
     }
@@ -997,8 +840,8 @@ function WallTorch({ position }: { position: [number, number, number] }) {
       <pointLight
         ref={lightRef}
         color="#ff6822"
-        intensity={1.4}
-        distance={8}
+        intensity={2.8}
+        distance={14}
         castShadow
       />
     </group>
@@ -1006,50 +849,39 @@ function WallTorch({ position }: { position: [number, number, number] }) {
 }
 
 // =====================
-// Candle - floor-standing horror candle
+// CeilingBulb - bare hanging ceiling bulb
 // =====================
-function Candle({ position }: { position: [number, number, number] }) {
-  const lightRef = useRef<THREE.PointLight>(null);
-  const offset = useRef(Math.random() * Math.PI * 2);
-
-  useFrame((state) => {
-    if (lightRef.current) {
-      const t = state.clock.elapsedTime;
-      lightRef.current.intensity =
-        0.8 +
-        Math.sin(t * 8.1 + offset.current) * 0.3 +
-        Math.sin(t * 13.7 + offset.current) * 0.1;
-    }
-  });
-
+function CeilingBulb({ position }: { position: [number, number, number] }) {
+  // position is [x, ceilingY, z] -- typically y=4 (ceiling height)
   return (
     <group position={position}>
-      {/* Wax body */}
-      <mesh position={[0, 0.15, 0]}>
-        <cylinderGeometry args={[0.04, 0.05, 0.3, 8]} />
-        <meshStandardMaterial color="#e8dcc8" roughness={0.9} />
+      {/* Cord */}
+      <mesh position={[0, -0.4, 0]}>
+        <cylinderGeometry args={[0.012, 0.012, 0.8, 6]} />
+        <meshStandardMaterial color="#222222" roughness={1} />
       </mesh>
-      {/* Flame */}
-      <mesh position={[0, 0.34, 0]}>
-        <sphereGeometry args={[0.035, 6, 8]} />
+      {/* Socket */}
+      <mesh position={[0, -0.82, 0]}>
+        <cylinderGeometry args={[0.06, 0.05, 0.1, 8]} />
+        <meshStandardMaterial color="#333333" roughness={0.8} metalness={0.5} />
+      </mesh>
+      {/* Bulb */}
+      <mesh position={[0, -0.97, 0]}>
+        <sphereGeometry args={[0.12, 10, 10]} />
         <meshStandardMaterial
-          color="#ffdd44"
-          emissive="#ff9900"
-          emissiveIntensity={4}
+          color="#fffde7"
+          emissive="#ffe066"
+          emissiveIntensity={3}
           transparent
-          opacity={0.9}
+          opacity={0.95}
         />
       </mesh>
-      {/* Wax drip pool */}
-      <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.06, 8]} />
-        <meshStandardMaterial color="#d4c8a8" roughness={0.95} />
-      </mesh>
+      {/* Light */}
       <pointLight
-        ref={lightRef}
-        color="#ff9922"
-        intensity={0.8}
-        distance={6}
+        position={[0, -1.1, 0]}
+        color="#ffe8a0"
+        intensity={6.0}
+        distance={20}
         castShadow={false}
       />
     </group>
@@ -1062,69 +894,65 @@ function HouseLighting() {
   useFrame((state) => {
     if (light1.current) {
       light1.current.intensity =
-        1.0 + Math.sin(state.clock.elapsedTime * 7.3) * 0.12;
+        1.2 + Math.sin(state.clock.elapsedTime * 7.3) * 0.12;
     }
     if (light2.current) {
       light2.current.intensity =
-        0.7 + Math.sin(state.clock.elapsedTime * 5.1 + 1) * 0.1;
+        0.84 + Math.sin(state.clock.elapsedTime * 5.1 + 1) * 0.1;
     }
   });
 
   return (
     <>
-      {/* Blood-red ambient - very low */}
-      <ambientLight intensity={0.12} color="#1a0000" />
+      {/* Blood-red ambient - lifted for visibility */}
+      <ambientLight intensity={1.2} color="#4a3010" />
       {/* Dim crimson fill from above */}
-      <directionalLight
-        color="#1a0000"
-        intensity={0.05}
-        position={[0, 10, 0]}
-      />
+      <directionalLight color="#3a0800" intensity={0.3} position={[0, 10, 0]} />
       <pointLight
         ref={light1}
         color="#cc1100"
-        intensity={1.0}
-        distance={12}
+        intensity={1.2}
+        distance={18}
         position={[0, 3, 0]}
       />
       <pointLight
         ref={light2}
         color="#880022"
-        intensity={0.7}
-        distance={15}
+        intensity={0.84}
+        distance={22}
         position={[-8, 3, -8]}
       />
       <pointLight
         color="#661100"
-        intensity={0.5}
-        distance={10}
+        intensity={0.6}
+        distance={16}
         position={[8, 3, 8]}
       />
       <pointLight
         color="#550011"
-        intensity={0.6}
-        distance={12}
+        intensity={0.72}
+        distance={18}
         position={[8, 3, -12]}
       />
       <pointLight
         color="#440000"
-        intensity={0.4}
-        distance={10}
+        intensity={0.48}
+        distance={16}
         position={[-8, 3, 10]}
       />
       {/* Wall torches at key spots */}
       <WallTorch position={[-11.5, 2.5, -8]} />
       <WallTorch position={[11.5, 2.5, -8]} />
-      {/* Floor candles throughout rooms */}
-      <Candle position={[-9, 0.15, -5]} />
-      <Candle position={[9, 0.15, -5]} />
-      <Candle position={[-9, 0.15, 3]} />
-      <Candle position={[9, 0.15, 3]} />
-      <Candle position={[0, 0.15, -15]} />
-      <Candle position={[-5, 0.15, -15]} />
-      <Candle position={[5, 0.15, -15]} />
-      <Candle position={[-3, 0.15, 8]} />
-      <Candle position={[3, 0.15, 8]} />
+      {/* Ceiling bulbs throughout rooms */}
+      <CeilingBulb position={[-9, 4, -5]} />
+      <CeilingBulb position={[9, 4, -5]} />
+      <CeilingBulb position={[-9, 4, 3]} />
+      <CeilingBulb position={[9, 4, 3]} />
+      <CeilingBulb position={[0, 4, -15]} />
+      <CeilingBulb position={[-5, 4, -15]} />
+      <CeilingBulb position={[5, 4, -15]} />
+      <CeilingBulb position={[-3, 4, 8]} />
+      <CeilingBulb position={[3, 4, 8]} />
     </>
   );
 }
@@ -1315,7 +1143,7 @@ function Scene({
 }) {
   return (
     <>
-      <fogExp2 attach="fog" args={["#0a0002", 0.035]} />
+      <fogExp2 attach="fog" args={["#0a0002", 0.015]} />
       <HouseLighting />
       <HouseGeometry gateUnlocked={gameState.gateUnlocked} />
       {/* Blood puddles on the floor */}
@@ -2405,7 +2233,8 @@ function NityaFigure({
           100% { transform: rotate(25deg); }
         }
       `}</style>
-      {/* ── Long flowing hair behind head ── */}
+
+      {/* ── Long dark brown wavy hair behind head ── */}
       <div
         style={{
           position: "absolute",
@@ -2415,13 +2244,13 @@ function NityaFigure({
           width: 76,
           height: 130,
           background:
-            "linear-gradient(to bottom, #0a0212 0%, #0d0318 50%, transparent 100%)",
+            "linear-gradient(to bottom, #3d1a08 0%, #6b3014 40%, #2a0e04 100%)",
           borderRadius: "0 0 40px 40px",
           zIndex: 0,
-          boxShadow: "inset 0 10px 20px rgba(80,0,160,0.15)",
+          boxShadow: "inset 0 10px 20px rgba(40,10,0,0.25)",
         }}
       />
-      {/* Hair left strand */}
+      {/* Hair left strand (wavy) */}
       <div
         style={{
           position: "absolute",
@@ -2430,13 +2259,13 @@ function NityaFigure({
           width: 20,
           height: 115,
           background:
-            "linear-gradient(to bottom, #0a0212 0%, #120418 60%, transparent 100%)",
-          borderRadius: "0 0 60% 60%",
+            "linear-gradient(to bottom, #3d1a08 0%, #5a2510 60%, transparent 100%)",
+          borderRadius: "0 0 70% 50%",
           transform: "rotate(-10deg)",
           zIndex: 0,
         }}
       />
-      {/* Hair right strand */}
+      {/* Hair right strand (wavy) */}
       <div
         style={{
           position: "absolute",
@@ -2445,13 +2274,13 @@ function NityaFigure({
           width: 20,
           height: 115,
           background:
-            "linear-gradient(to bottom, #0a0212 0%, #120418 60%, transparent 100%)",
-          borderRadius: "0 0 60% 60%",
+            "linear-gradient(to bottom, #3d1a08 0%, #5a2510 60%, transparent 100%)",
+          borderRadius: "0 0 50% 70%",
           transform: "rotate(10deg)",
           zIndex: 0,
         }}
       />
-      {/* Hair glossy highlight streak */}
+      {/* Hair glossy highlight streak (warm brown) */}
       <div
         style={{
           position: "absolute",
@@ -2461,120 +2290,10 @@ function NityaFigure({
           width: 8,
           height: 80,
           background:
-            "linear-gradient(to bottom, rgba(120,60,220,0.35) 0%, rgba(80,20,160,0.15) 60%, transparent 100%)",
+            "linear-gradient(to bottom, rgba(160,90,40,0.35) 0%, rgba(100,50,20,0.15) 60%, transparent 100%)",
           borderRadius: 8,
           zIndex: 1,
           pointerEvents: "none",
-        }}
-      />
-
-      {/* ── Crown base ── */}
-      <div
-        style={{
-          position: "absolute",
-          top: 6,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 54,
-          height: 13,
-          background:
-            "linear-gradient(to bottom, #f5d060 0%, #c9922b 50%, #a07010 100%)",
-          borderRadius: "3px 3px 0 0",
-          zIndex: 4,
-          boxShadow:
-            "0 0 10px rgba(245,208,96,0.6), 0 0 20px rgba(200,140,20,0.3), inset 0 2px 4px rgba(255,255,200,0.4)",
-        }}
-      />
-      {/* Crown spike far-left (short) */}
-      <div
-        style={{
-          position: "absolute",
-          top: -2,
-          left: "14%",
-          width: 0,
-          height: 0,
-          borderLeft: "5px solid transparent",
-          borderRight: "5px solid transparent",
-          borderBottom: "14px solid #c9922b",
-          zIndex: 4,
-          filter: "drop-shadow(0 0 4px rgba(245,208,96,0.8))",
-        }}
-      />
-      {/* Crown spike left (medium) */}
-      <div
-        style={{
-          position: "absolute",
-          top: -6,
-          left: "28%",
-          width: 0,
-          height: 0,
-          borderLeft: "6px solid transparent",
-          borderRight: "6px solid transparent",
-          borderBottom: "20px solid #d4a030",
-          zIndex: 4,
-          filter: "drop-shadow(0 0 5px rgba(245,208,96,0.9))",
-        }}
-      />
-      {/* Crown spike center (tallest) */}
-      <div
-        style={{
-          position: "absolute",
-          top: -14,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 0,
-          height: 0,
-          borderLeft: "8px solid transparent",
-          borderRight: "8px solid transparent",
-          borderBottom: "28px solid #f5d060",
-          zIndex: 4,
-          filter: "drop-shadow(0 0 8px rgba(245,220,80,1))",
-        }}
-      />
-      {/* Crown spike right (medium) */}
-      <div
-        style={{
-          position: "absolute",
-          top: -6,
-          right: "28%",
-          width: 0,
-          height: 0,
-          borderLeft: "6px solid transparent",
-          borderRight: "6px solid transparent",
-          borderBottom: "20px solid #d4a030",
-          zIndex: 4,
-          filter: "drop-shadow(0 0 5px rgba(245,208,96,0.9))",
-        }}
-      />
-      {/* Crown spike far-right (short) */}
-      <div
-        style={{
-          position: "absolute",
-          top: -2,
-          right: "14%",
-          width: 0,
-          height: 0,
-          borderLeft: "5px solid transparent",
-          borderRight: "5px solid transparent",
-          borderBottom: "14px solid #c9922b",
-          zIndex: 4,
-          filter: "drop-shadow(0 0 4px rgba(245,208,96,0.8))",
-        }}
-      />
-      {/* Crown center crimson gem */}
-      <div
-        style={{
-          position: "absolute",
-          top: 8,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 7,
-          height: 7,
-          background:
-            "radial-gradient(ellipse, #ff8888 0%, #cc0000 60%, #800000 100%)",
-          borderRadius: "50%",
-          zIndex: 5,
-          boxShadow: "0 0 6px rgba(255,0,0,0.9), 0 0 12px rgba(200,0,0,0.5)",
         }}
       />
 
@@ -2644,9 +2363,9 @@ function NityaFigure({
               width: 9,
               height: 7,
               background:
-                "radial-gradient(ellipse at 35% 30%, #ff6666 0%, #cc0000 50%, #7a0000 100%)",
+                "radial-gradient(ellipse at 35% 30%, #5a0000 0%, #3d0000 50%, #1a0000 100%)",
               borderRadius: "50%",
-              boxShadow: "0 0 5px rgba(200,0,0,0.7)",
+              boxShadow: "0 0 3px rgba(80,0,0,0.6)",
             }}
           />
           {/* Left pupil */}
@@ -2711,9 +2430,9 @@ function NityaFigure({
               width: 9,
               height: 7,
               background:
-                "radial-gradient(ellipse at 35% 30%, #ff6666 0%, #cc0000 50%, #7a0000 100%)",
+                "radial-gradient(ellipse at 35% 30%, #5a0000 0%, #3d0000 50%, #1a0000 100%)",
               borderRadius: "50%",
-              boxShadow: "0 0 5px rgba(200,0,0,0.7)",
+              boxShadow: "0 0 3px rgba(80,0,0,0.6)",
             }}
           />
           {/* Right pupil */}
@@ -2867,22 +2586,6 @@ function NityaFigure({
           zIndex: 2,
         }}
       />
-      {/* Gold necklace */}
-      <div
-        style={{
-          position: "absolute",
-          top: 80,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 36,
-          height: 5,
-          background:
-            "linear-gradient(to right, transparent 0%, #c9922b 20%, #f5d060 50%, #c9922b 80%, transparent 100%)",
-          borderRadius: "0 0 8px 8px",
-          zIndex: 3,
-          boxShadow: "0 0 5px rgba(245,208,96,0.5)",
-        }}
-      />
 
       {/* ── Left arm (skin + gold bracer) ── */}
       <div
@@ -2899,7 +2602,7 @@ function NityaFigure({
           zIndex: 1,
         }}
       />
-      {/* Left bracer */}
+      {/* Left glove cuff (skin) */}
       <div
         style={{
           position: "absolute",
@@ -2908,11 +2611,11 @@ function NityaFigure({
           width: 14,
           height: 10,
           background:
-            "linear-gradient(to bottom, #f5d060 0%, #c9922b 50%, #a07010 100%)",
+            "linear-gradient(to bottom, #e8b89a 0%, #d4a080 50%, #c08060 100%)",
           borderRadius: 4,
           transform: "rotate(-12deg)",
           zIndex: 2,
-          boxShadow: "0 0 5px rgba(245,208,96,0.5)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
         }}
       />
 
@@ -2931,7 +2634,7 @@ function NityaFigure({
           zIndex: 1,
         }}
       />
-      {/* Right bracer */}
+      {/* Right glove cuff (skin) */}
       <div
         style={{
           position: "absolute",
@@ -2940,15 +2643,15 @@ function NityaFigure({
           width: 14,
           height: 10,
           background:
-            "linear-gradient(to bottom, #f5d060 0%, #c9922b 50%, #a07010 100%)",
+            "linear-gradient(to bottom, #e8b89a 0%, #d4a080 50%, #c08060 100%)",
           borderRadius: 4,
           transform: "rotate(12deg)",
           zIndex: 2,
-          boxShadow: "0 0 5px rgba(245,208,96,0.5)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
         }}
       />
 
-      {/* ── Armored corset ── */}
+      {/* ── Red satin nighty bodice ── */}
       <div
         style={{
           position: "absolute",
@@ -2958,166 +2661,45 @@ function NityaFigure({
           width: 54,
           height: 54,
           background:
-            "linear-gradient(160deg, #c02040 0%, #8b0020 40%, #5a0018 100%)",
+            "linear-gradient(160deg, #cc1133 0%, #a00020 40%, #880018 100%)",
           borderRadius: "8px 8px 4px 4px",
           zIndex: 2,
           boxShadow:
-            "inset 0 4px 10px rgba(255,160,100,0.2), inset 0 -4px 10px rgba(0,0,0,0.5), 0 0 8px rgba(180,20,40,0.3)",
+            "inset 0 4px 10px rgba(255,80,80,0.25), inset 0 -4px 10px rgba(0,0,0,0.3), 0 0 6px rgba(180,20,40,0.4)",
         }}
-      >
-        {/* Gold trim top edge */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background:
-              "linear-gradient(to right, #a07010, #f5d060 50%, #a07010)",
-            borderRadius: "8px 8px 0 0",
-          }}
-        />
-        {/* Vertical channel lines */}
-        <div
-          style={{
-            position: "absolute",
-            top: 6,
-            left: "30%",
-            width: 1,
-            height: 38,
-            background: "rgba(245,208,96,0.35)",
-            borderRadius: 1,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 6,
-            right: "30%",
-            width: 1,
-            height: 38,
-            background: "rgba(245,208,96,0.35)",
-            borderRadius: 1,
-          }}
-        />
-        {/* Horizontal detail lines */}
-        <div
-          style={{
-            position: "absolute",
-            top: 18,
-            left: 8,
-            right: 8,
-            height: 1,
-            background: "rgba(245,208,96,0.3)",
-            borderRadius: 1,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 34,
-            left: 8,
-            right: 8,
-            height: 1,
-            background: "rgba(245,208,96,0.25)",
-            borderRadius: 1,
-          }}
-        />
-        {/* Center gem cluster */}
-        {/* Left gold gem */}
-        <div
-          style={{
-            position: "absolute",
-            top: 8,
-            left: "50%",
-            marginLeft: -13,
-            width: 7,
-            height: 7,
-            background:
-              "radial-gradient(ellipse, #fff0a0 0%, #f5d060 50%, #a07010 100%)",
-            borderRadius: "50%",
-            boxShadow: "0 0 5px rgba(245,208,96,0.8)",
-          }}
-        />
-        {/* Center crimson gem */}
-        <div
-          style={{
-            position: "absolute",
-            top: 6,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 10,
-            height: 10,
-            background:
-              "radial-gradient(ellipse, #ff8888 0%, #cc0000 55%, #660000 100%)",
-            borderRadius: "50%",
-            boxShadow: "0 0 8px rgba(255,0,0,0.9), 0 0 16px rgba(200,0,0,0.4)",
-          }}
-        />
-        {/* Right gold gem */}
-        <div
-          style={{
-            position: "absolute",
-            top: 8,
-            left: "50%",
-            marginLeft: 6,
-            width: 7,
-            height: 7,
-            background:
-              "radial-gradient(ellipse, #fff0a0 0%, #f5d060 50%, #a07010 100%)",
-            borderRadius: "50%",
-            boxShadow: "0 0 5px rgba(245,208,96,0.8)",
-          }}
-        />
-      </div>
+      />
 
-      {/* ── Skirt / Robe ── */}
+      {/* ── Red satin nighty skirt ── */}
       <div
         style={{
           position: "absolute",
           top: 133,
           left: "50%",
           transform: "translateX(-50%)",
-          width: 72,
-          height: 68,
+          width: 66,
+          height: 48,
           background:
-            "linear-gradient(160deg, #8b0038 0%, #5a0030 40%, #38001e 100%)",
-          borderRadius: "4px 4px 36px 36px",
+            "linear-gradient(160deg, #cc1133 0%, #a00020 40%, #880018 100%)",
+          borderRadius: "4px 4px 24px 24px",
           zIndex: 2,
-          clipPath: "polygon(6% 0%, 94% 0%, 102% 100%, -2% 100%)",
-          boxShadow: "inset 0 4px 10px rgba(180,0,80,0.3)",
+          clipPath: "polygon(6% 0%, 94% 0%, 100% 100%, 0% 100%)",
+          boxShadow:
+            "inset 0 4px 10px rgba(255,80,80,0.2), inset 0 -4px 8px rgba(0,0,0,0.25)",
         }}
       />
-      {/* Gold hem border */}
+      {/* Skirt shimmer highlight */}
       <div
         style={{
           position: "absolute",
-          top: 194,
+          top: 133,
           left: "50%",
           transform: "translateX(-50%)",
-          width: 80,
-          height: 4,
+          width: 66,
+          height: 48,
           background:
-            "linear-gradient(to right, transparent 0%, #c9922b 15%, #f5d060 50%, #c9922b 85%, transparent 100%)",
+            "linear-gradient(135deg, rgba(255,80,80,0.35) 0%, transparent 40%, rgba(180,20,40,0.2) 80%)",
           zIndex: 3,
-          borderRadius: 2,
-          boxShadow: "0 0 6px rgba(245,208,96,0.5)",
-        }}
-      />
-      {/* Robe shimmer overlay */}
-      <div
-        style={{
-          position: "absolute",
-          top: 133,
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: 72,
-          height: 68,
-          background:
-            "linear-gradient(135deg, rgba(220,60,120,0.2) 0%, transparent 40%, rgba(100,0,60,0.3) 80%)",
-          zIndex: 2,
-          clipPath: "polygon(6% 0%, 94% 0%, 102% 100%, -2% 100%)",
+          clipPath: "polygon(6% 0%, 94% 0%, 100% 100%, 0% 100%)",
           pointerEvents: "none",
         }}
       />
@@ -3140,7 +2722,7 @@ function NityaFigure({
           zIndex: 1,
         }}
       />
-      {/* Left boot */}
+      {/* Left shoe (dark) */}
       <div
         style={{
           position: "absolute",
@@ -3148,7 +2730,7 @@ function NityaFigure({
           left: "25%",
           width: 18,
           height: 10,
-          background: "linear-gradient(to bottom, #1a0a0a, #0d0505)",
+          background: "linear-gradient(to bottom, #1a0000, #0d0000)",
           borderRadius: "3px 3px 5px 5px",
           transformOrigin: "top center",
           animation:
@@ -3176,7 +2758,7 @@ function NityaFigure({
           zIndex: 1,
         }}
       />
-      {/* Right boot */}
+      {/* Right shoe (dark) */}
       <div
         style={{
           position: "absolute",
@@ -3184,7 +2766,7 @@ function NityaFigure({
           right: "25%",
           width: 18,
           height: 10,
-          background: "linear-gradient(to bottom, #1a0a0a, #0d0505)",
+          background: "linear-gradient(to bottom, #1a0000, #0d0000)",
           borderRadius: "3px 3px 5px 5px",
           transformOrigin: "top center",
           animation:
@@ -3939,7 +3521,6 @@ function RotateOverlay() {
 // App
 // =====================
 export default function App() {
-  const { actor } = useActor();
   const playerPosRef = useRef(new THREE.Vector3(0, PLAYER_HEIGHT, 10));
   const ghostPosRef = useRef(new THREE.Vector3(-10, 0, -15));
 
@@ -4000,12 +3581,9 @@ export default function App() {
 
   const handleEscape = useCallback(() => {
     setGameState((prev) => {
-      if (actor) {
-        actor.saveScore("Player", BigInt(prev.daysLeft)).catch(() => {});
-      }
       return { ...prev, phase: "victory" };
     });
-  }, [actor]);
+  }, []);
 
   const handleRestart = useCallback(() => {
     playerPosRef.current.set(0, PLAYER_HEIGHT, 14);

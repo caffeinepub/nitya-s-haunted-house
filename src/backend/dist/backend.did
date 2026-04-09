@@ -1,0 +1,9 @@
+type ScoreEntry = 
+ record {
+   name: text;
+   score: nat;
+ };
+service : {
+  getTopScores: () -> (vec ScoreEntry) query;
+  saveScore: (name: text, score: nat) -> ();
+}
